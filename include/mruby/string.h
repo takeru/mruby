@@ -7,6 +7,8 @@
 #ifndef MRUBY_STRING_H
 #define MRUBY_STRING_H
 
+#include "mruby.h"
+
 #ifdef INCLUDE_ENCODING
 #include "encoding.h"
 #endif
