@@ -19,7 +19,7 @@
 
 
 #ifdef __APPLE__
-#include <crt_externs.h>
+//#include <crt_externs.h>
 #endif
 
 #include <stdio.h>

@@ -39,7 +39,7 @@
 #include <setjmp.h>
 
 #ifdef __APPLE__
-#include <crt_externs.h>
+//#include <crt_externs.h>
 #endif
 
 /* Make alloca work the best possible way.  */
