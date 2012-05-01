@@ -1,8 +1,8 @@
 /*
 ** mruby - An embeddable Ruby implementaion
-** 
+**
 ** Copyright (c) mruby developers 2010-2012
-** 
+**
 ** Permission is hereby granted, free of charge, to any person obtaining
 ** a copy of this software and associated documentation files (the
 ** "Software"), to deal in the Software without restriction, including
@@ -33,7 +33,7 @@
 
 enum mrb_vtype {
   MRB_TT_FALSE = 0,   /*   0 */
-  MRB_TT_FREE,	      /*   1 */
+  MRB_TT_FREE,        /*   1 */
   MRB_TT_TRUE,        /*   2 */
   MRB_TT_FIXNUM,      /*   3 */
   MRB_TT_SYMBOL,      /*   4 */
@@ -68,7 +68,7 @@ typedef struct mrb_value {
     mrb_int i;
     mrb_sym sym;
   } value;
-  enum mrb_vtype tt:8;
+  enum mrb_vtype tt;
 } mrb_value;
 
 #define mrb_type(o)   (o).tt
@@ -276,8 +276,8 @@ typedef struct mrb_state {
   mrb_int gc_step_ratio;
 
   mrb_sym symidx;
-  struct kh_n2s *name2sym;	/* symbol table */
-  struct kh_s2n *sym2name;	/* reverse symbol table */
+  struct kh_n2s *name2sym;      /* symbol table */
+  struct kh_s2n *sym2name;      /* reverse symbol table */
   struct RNode *local_svar;/* regexp */
 
   struct RClass *eException_class;
@@ -310,22 +310,22 @@ struct RClass * mrb_define_class_under(mrb_state *mrb, struct RClass *outer, con
 struct RClass * mrb_define_module_under(mrb_state *mrb, struct RClass *outer, const char *name);
 
 /* required arguments */
-#define ARGS_REQ(n)	(((n)&0x1f) << 19)
+#define ARGS_REQ(n)     (((n)&0x1f) << 19)
 /* optional arguments */
-#define ARGS_OPT(n)	(((n)&0x1f) << 14)
+#define ARGS_OPT(n)     (((n)&0x1f) << 14)
 /* rest argument */
-#define ARGS_REST()	(1 << 13)
+#define ARGS_REST()     (1 << 13)
 /* required arguments after rest */
-#define ARGS_POST(n)	(((n)&0x1f) << 8)
+#define ARGS_POST(n)    (((n)&0x1f) << 8)
 /* keyword arguments (n of keys, kdict) */
-#define ARGS_KEY(n1,n2)	((((n1)&0x1f) << 3) | ((n2)?(1<<2):0))
+#define ARGS_KEY(n1,n2) ((((n1)&0x1f) << 3) | ((n2)?(1<<2):0))
 /* block argument */
-#define ARGS_BLOCK()	(1 << 1)
+#define ARGS_BLOCK()    (1 << 1)
 
 /* accept any number of arguments */
-#define ARGS_ANY()	ARGS_REST()
+#define ARGS_ANY()      ARGS_REST()
 /* accept no arguments */
-#define ARGS_NONE()	0
+#define ARGS_NONE()     0
 
 int mrb_get_args(mrb_state *mrb, const char *format, ...);
 
@@ -406,7 +406,7 @@ const char * mrb_obj_classname(mrb_state *mrb, mrb_value obj);
 struct RClass* mrb_obj_class(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_class_path(mrb_state *mrb, struct RClass *c);
 mrb_value mrb_convert_type(mrb_state *mrb, mrb_value val, mrb_int type, const char *tname, const char *method);
-mrb_int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, struct RClass *c);
+int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, struct RClass *c);
 mrb_value mrb_obj_inspect(mrb_state *mrb, mrb_value self);
 mrb_value mrb_obj_clone(mrb_state *mrb, mrb_value self);
 mrb_value mrb_check_funcall(mrb_state *mrb, mrb_value recv, mrb_sym mid, int argc, mrb_value *argv);
@@ -600,4 +600,4 @@ int mrb_sourceline(void);
 void ruby_default_signal(int sig);
 mrb_value mrb_attr_get(mrb_state *mrb, mrb_value obj, mrb_sym id);
 
-#endif	/* MRUBY_H */
+#endif  /* MRUBY_H */

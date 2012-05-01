@@ -1,6 +1,6 @@
 /*
 ** mrbconf.h - mruby core configuration
-** 
+**
 ** See Copyright Notice in mruby.h
 */
 
@@ -17,7 +17,7 @@ typedef double mrb_float;
 #endif
 #define readfloat(p) (mrb_float)strtod((p),NULL)
 
-typedef int32_t mrb_int;
+typedef int mrb_int;
 typedef intptr_t mrb_sym;
 #define readint(p,base) strtol((p),NULL,(base))
 
@@ -42,4 +42,4 @@ typedef intptr_t mrb_sym;
 # define TRUE 1
 #endif
 
-#endif	/* MRUBYCONF_H */
+#endif  /* MRUBYCONF_H */

@@ -1,6 +1,6 @@
 /*
 ** numeric.c - Numeric, Integer, Float, Fixnum class
-** 
+**
 ** See Copyright Notice in mruby.h
 */
 
@@ -102,17 +102,17 @@ const unsigned char mrb_nan[] = "\x7f\xc0\x00\x00";
 #endif
 
 #ifdef MRB_USE_FLOAT
-#define round(f) roundf(f)
 #define floor(f) floorf(f)
 #define ceil(f) ceilf(f)
 #define floor(f) floorf(f)
 #define fmod(x,y) fmodf(x,y)
 #endif
 
-#ifndef round
-mrb_float round(mrb_float x)
+static mrb_float
+mrb_round(mrb_float x)
 {
     mrb_float f;
+
     if (x > 0.0) {
         f = floor(x);
         x = f + (x - f >= 0.5);
@@ -123,7 +123,8 @@ mrb_float round(mrb_float x)
     }
     return x;
 }
-#endif
+
+#define round(x) mrb_round(x)
 
 void mrb_cmperr(mrb_state *mrb, mrb_value x, mrb_value y);
 

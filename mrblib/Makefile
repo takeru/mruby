@@ -1,6 +1,5 @@
 # makefile discription.
-# basic build file for RiteVM library
-# 11.Oct.2011 coded by Hiroshi Mimaki.
+# basic build file for mruby library (Ruby part)
 
 # project-specific macros
 # extension of the executable-file is modifiable(.exe .out ...)
@@ -10,6 +9,7 @@ MLIB := $(TARGET).o
 CLIB := $(TARGET).c
 DLIB := $(TARGET).ctmp
 RLIB := $(TARGET).rbtmp
+DEPLIB := $(TARGET).d
 MRB1 := $(BASEDIR)/*.rb
 MRBS := $(MRB1)
 
@@ -24,7 +24,11 @@ CFLAGS = -O3
 endif
 INCLUDES = -I../src -I../include
 ALL_CFLAGS = -Wall -Werror-implicit-function-declaration $(CFLAGS)
-MAKE_FLAGS = --no-print-directory CC=$(CC) LL=$(LL)
+ifeq ($(OS),Windows_NT)
+  MAKE_FLAGS = CC=$(CC) LL=$(LL) ALL_CFLAGS="$(ALL_CFLAGS)"
+else
+  MAKE_FLAGS = CC='$(CC)' LL='$(LL)' ALL_CFLAGS='$(ALL_CFLAGS)'
+endif
 
 # mruby compiler
 ifeq ($(OS),Windows_NT)
@@ -58,8 +62,6 @@ $(RLIB) : $(MRBS)
 # clean up
 .PHONY : clean
 clean :
-	-rm -f $(MRBC) $(MLIB) $(CLIB) $(RLIB) $(DLIB)
-	-rm -f $(patsubst %.c,%.d,$(CLIB))
-	-rm -f $(patsubst %.c,%.o,$(EXCEPT1)) $(patsubst %.c,%.d,$(EXCEPT1))
 	@echo "make: removing targets, objects and depend files of `pwd`"
+	-rm -f $(MRBC) $(MLIB) $(CLIB) $(RLIB) $(DLIB) $(DEPLIB)
 

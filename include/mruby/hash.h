@@ -1,6 +1,6 @@
 /*
 ** hash.h - Hash class
-** 
+**
 ** See Copyright Notice in mruby.h
 */
 
@@ -15,9 +15,9 @@ struct RHash {
 
 #define N 624
 #define M 397
-#define MATRIX_A 0x9908b0dfU	/* constant vector a */
-#define UMASK 0x80000000U	/* most significant w-r bits */
-#define LMASK 0x7fffffffU	/* least significant r bits */
+#define MATRIX_A 0x9908b0dfU    /* constant vector a */
+#define UMASK 0x80000000U       /* most significant w-r bits */
+#define LMASK 0x7fffffffU       /* least significant r bits */
 #define MIXBITS(u,v) ( ((u) & UMASK) | ((v) & LMASK) )
 #define TWIST(u,v) ((MIXBITS(u,v) >> 1) ^ ((v)&1U ? MATRIX_A : 0U))
 enum {MT_MAX_STATE = N};
@@ -58,7 +58,6 @@ struct kh_ht * mrb_hash_tbl(mrb_state *mrb, mrb_value hash);
 #define MRB_HASH_PROC_DEFAULT 256
 #define MRB_RHASH_PROCDEFAULT_P(h) (RHASH(h)->flags & MRB_HASH_PROC_DEFAULT)
 
-char * ruby_strdup(const char *str);
 void mrb_reset_random_seed(void);
 mrb_value mrb_obj_is_proc(mrb_value proc);
 
