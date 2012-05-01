@@ -17,7 +17,7 @@ int main()
 }
 
 /*
-% gcc -o step1 step1.c -I ../include -I ../src ../lib/ritevm.a -lm
+% gcc -o step1 step1.c -I ../include -I ../src ../mrblib/mrblib.o ../lib/ritevm.a -lm
 % ./step1
 hello
 3
