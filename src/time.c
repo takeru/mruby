@@ -17,17 +17,17 @@
 /* gettimeofday(2) */
 /* C99 does not have gettimeofday that is required to retrieve microseconds */
 /* uncomment following macro on platforms without gettimeofday(2) */
-/* #define NO_USE_GETTIMEOFDAY */
+/* #define NO_GETTIMEOFDAY */
 
 /* gmtime(3) */
 /* C99 does not have reentrant gmtime_r() so it might cause troubles under */
 /* multi-threading environment.  undef following macro on platforms that */
 /* does not have gmtime_r() and localtime_r(). */
-/* #define NO_USE_GMTIME_R */
+/* #define NO_GMTIME_R */
 
 #ifdef _WIN32
 /* unfortunately Win32 platform do not provide gmtime_r/localtime_r */
-#define NO_USE_GMTIME_R
+#define NO_GMTIME_R
 #endif
 
 /* timegm(3) */
@@ -37,10 +37,10 @@
 
 /** end of Time class configuration */
 
-#ifndef NO_USE_GETTIMEOFDAY
+#ifndef NO_GETTIMEOFDAY
 #include <sys/time.h>
 #endif
-#ifndef NO_USE_GMTIME_R
+#ifndef NO_GMTIME_R
 #define gmtime_r(t,r) gmtime(t)
 #define localtime_r(t,r) (tzset(),localtime(t))
 #endif
@@ -138,7 +138,7 @@ mrb_time_update_datetime(struct mrb_time *self)
     aid = localtime_r(&self->sec, &self->datetime);
   }
   if(!aid) return NULL;
-#ifndef NO_USE_GMTIME_R
+#ifndef NO_GMTIME_R
   self->datetime = *aid; // copy data
 #endif
 
@@ -174,14 +174,26 @@ mrb_time_make(mrb_state *mrb, struct RClass *c, mrb_float seconds, enum mrb_time
 }
 
 static struct mrb_time*
-current_time(mrb_state *mrb)
+current_mrb_time(mrb_state *mrb)
 {
   struct mrb_time *tm;  
 
   tm = mrb_malloc(mrb, sizeof(*tm));
-#ifdef NO_USE_GETTIMEOFDAY
-  tm->sec  = time(NULL);
-  tm->usec = 0;
+#ifdef NO_GETTIMEOFDAY
+  {
+    static time_t last_sec = 0, last_usec = 0;
+
+    tm->sec  = time(NULL);
+    if (tm->sec != last_sec) {
+      last_sec = tm->sec;
+      last_usec = 0;
+    }
+    else {
+      /* add 1 usec to differentiate two times */
+      last_usec += 1;
+    }
+    tm->usec = last_usec;
+  }
 #else
   {
     struct timeval tv;
@@ -201,7 +213,7 @@ current_time(mrb_state *mrb)
 static mrb_value
 mrb_time_now(mrb_state *mrb, mrb_value self)
 {
-  return mrb_time_wrap(mrb, mrb_class_ptr(self), current_time(mrb));
+  return mrb_time_wrap(mrb, mrb_class_ptr(self), current_mrb_time(mrb));
 }
 
 /* 15.2.19.6.1 */
@@ -466,7 +478,7 @@ mrb_time_initialize(mrb_state *mrb, mrb_value self)
     mrb_time_free(mrb, tm);
   }
   if (mrb->ci->argc == 0) {
-    tm = current_time(mrb);
+    tm = current_mrb_time(mrb);
   }
   else {
     mrb_get_args(mrb, "iiiiiii",
