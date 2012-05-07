@@ -27,7 +27,7 @@ int main()
 }
 
 /*
-% gcc -o step2 step2.c -I ../include -I ../src ../mrblib/mrblib.o ../lib/ritevm.a -lm
+% gcc -o step2 step2.c -I ../include -I ../src ../mrblib/mrblib.o ../lib/libmruby.a -lm
 % ./step2
 welcome to step2.
 fib(0) = 0

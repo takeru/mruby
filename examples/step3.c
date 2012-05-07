@@ -64,7 +64,7 @@ int main()
 }
 
 /*
-% gcc -o step3 step3.c -I ../include -I ../src ../mrblib/mrblib.o ../lib/ritevm.a -lm
+% gcc -o step3 step3.c -I ../include -I ../src ../mrblib/mrblib.o ../lib/libmruby.a -lm
 % ./step3
 welcome to step3.
 hello3 called.

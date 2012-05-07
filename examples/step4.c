@@ -63,7 +63,7 @@ int main()
 }
 
 /*
-% gcc -o step4 step4.c -I ../include -I ../src ../mrblib/mrblib.o ../lib/ritevm.a -lm
+% gcc -o step4 step4.c -I ../include -I ../src ../mrblib/mrblib.o ../lib/libmruby.a -lm
 % ./step4
 welcome to step4.
 plus(1,2) => 3
