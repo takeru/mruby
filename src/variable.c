@@ -259,6 +259,16 @@ const_get(mrb_state *mrb, struct RClass *base, mrb_sym sym)
     }
     c = c->super;
   }
+
+  if (!c) {
+    c = mrb->object_class;
+  }
+  
+  if (mrb_respond_to(mrb, mrb_obj_value(c), mrb_intern(mrb, "const_missing"))) {
+    mrb_value argv = mrb_symbol_value(sym);
+    return mrb_funcall_argv(mrb, mrb_obj_value(c), "const_missing", 1, &argv);
+  }
+
   mrb_raise(mrb, E_NAME_ERROR, "uninitialized constant %s",
             mrb_sym2name(mrb, sym));
   /* not reached */
@@ -436,7 +446,7 @@ mrb_class_from_sym(mrb_state *mrb, struct RClass *klass, mrb_sym id)
 }
 
 struct RClass *
-mrb_class_get(mrb_state *mrb, char *name)
+mrb_class_get(mrb_state *mrb, const char *name)
 {
   return mrb_class_from_sym(mrb, mrb->object_class, mrb_intern(mrb, name));
 }
@@ -449,7 +459,7 @@ mrb_attr_get(mrb_state *mrb, mrb_value obj, mrb_sym id)
 }
 
 struct RClass *
-mrb_class_obj_get(mrb_state *mrb, char *name)
+mrb_class_obj_get(mrb_state *mrb, const char *name)
 {
   mrb_value mod = mrb_obj_value(mrb->object_class);
   mrb_sym sym = mrb_intern(mrb, name);

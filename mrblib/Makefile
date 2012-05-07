@@ -12,10 +12,12 @@ RLIB := $(TARGET).rbtmp
 DEPLIB := $(TARGET).d
 MRB1 := $(BASEDIR)/*.rb
 MRBS := $(MRB1)
+LIBR := ../lib/libmruby.a
 
 # C compiler (gcc)
 CC = gcc
 LL = gcc
+AR = ar
 DEBUG_MODE = 1
 ifeq ($(DEBUG_MODE),1)
 CFLAGS = -g
@@ -42,6 +44,7 @@ endif
 
 .PHONY : all
 all : $(MRBC) $(MLIB)
+	$(AR) r $(LIBR) $(MLIB)
 	@echo "make: built targets of `pwd`"
 
 # Compile mrblib source

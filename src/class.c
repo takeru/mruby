@@ -309,9 +309,9 @@ mrb_define_method_id(mrb_state *mrb, struct RClass *c, mrb_sym mid, mrb_func_t f
 }
 
 void
-mrb_define_method(mrb_state *mrb, struct RClass *c, const char *name, mrb_func_t func, int apec)
+mrb_define_method(mrb_state *mrb, struct RClass *c, const char *name, mrb_func_t func, int aspec)
 {
-  return mrb_define_method_id(mrb, c, mrb_intern(mrb, name), func, apec);
+  return mrb_define_method_id(mrb, c, mrb_intern(mrb, name), func, aspec);
 }
 
 void
@@ -348,7 +348,7 @@ mrb_get_args(mrb_state *mrb, const char *format, ...)
       {
         mrb_value *p;
         p = va_arg(ap, mrb_value*);
-        *p =  (argc > i) ? *sp : mrb_nil_value();
+        *p =  *sp;
         i++; sp++;
       }
       break;
@@ -357,7 +357,25 @@ mrb_get_args(mrb_state *mrb, const char *format, ...)
         mrb_int *p;
 
         p = va_arg(ap, mrb_int*);
-        *p = (argc > i) ? mrb_fixnum(*sp) : 0;
+        switch (sp->tt) {
+        case MRB_TT_FIXNUM:
+          *p = mrb_fixnum(*sp);
+          break;
+        case MRB_TT_FLOAT:
+          *p = (mrb_int)mrb_float(*sp);
+          break;
+        case MRB_TT_FALSE:
+          *p = 0;
+          break;
+        default:
+	  {
+	    mrb_value tmp;
+
+	    tmp = mrb_convert_type(mrb, *sp, MRB_TT_FIXNUM, "Integer", "to_int");
+	    *p = mrb_fixnum(tmp);
+	  }
+          break;
+        }
         i++; sp++;
       }
       break;
@@ -368,13 +386,21 @@ mrb_get_args(mrb_state *mrb, const char *format, ...)
         p = va_arg(ap, mrb_float*);
         switch (sp->tt) {
         case MRB_TT_FLOAT:
-          *p = (argc > i) ? mrb_float(*sp) : 0;
+          *p = mrb_float(*sp);
           break;
         case MRB_TT_FIXNUM:
-          *p = (argc > i) ? (mrb_float)mrb_fixnum(*sp) : 0;
+          *p = (mrb_float)mrb_fixnum(*sp);
+          break;
+        case MRB_TT_FALSE:
+          *p = 0.0;
           break;
         default:
-          // error
+	  {
+	    mrb_value tmp;
+
+	    tmp = mrb_convert_type(mrb, *sp, MRB_TT_FLOAT, "Float", "to_f");
+	    *p = mrb_float(tmp);
+	  }
           break;
         }
         i++; sp++;
@@ -502,6 +528,7 @@ mrb_mod_include(mrb_state *mrb, mrb_value klass)
   mrb_value mod;
 
   mrb_get_args(mrb, "o", &mod);
+  mrb_check_type(mrb, mod, MRB_TT_MODULE);
   mrb_include_module(mrb, mrb_class_ptr(klass), mrb_class_ptr(mod));
   return mod;
 }
@@ -835,7 +862,8 @@ mrb_check_inheritable(mrb_state *mrb, struct RClass *super)
  * \param super     a class from which the new class derives.
  * \exception TypeError \a super is not inheritable.
  * \exception TypeError \a super is the Class class.
- */struct RClass *
+ */
+struct RClass *
 mrb_class_new(mrb_state *mrb, struct RClass *super)
 {
   struct RClass *c;

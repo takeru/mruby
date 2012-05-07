@@ -345,7 +345,8 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
     break;
 
   case MRB_TT_HASH:
-    mrb_gc_mark_ht(mrb, (struct RClass*)obj);
+    mrb_gc_mark_iv(mrb, (struct RObject*)obj);
+    mrb_gc_mark_ht(mrb, (struct RHash*)obj);
     break;
 
   case MRB_TT_STRING:
@@ -367,6 +368,24 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
       mrb_gc_mark_value(mrb, r->edges->end);
     }
     break;
+
+#ifdef INCLUDE_REGEXP
+  case MRB_TT_MATCH:
+    {
+      struct RMatch *m = (struct RMatch*)obj;
+
+      mrb_gc_mark(mrb, (struct RBasic*)m->str);
+      mrb_gc_mark(mrb, (struct RBasic*)m->regexp);
+    }
+    break;
+  case MRB_TT_REGEX:
+    {
+      struct RRegexp *r = (struct RRegexp*)obj;
+
+      mrb_gc_mark(mrb, (struct RBasic*)r->src);
+    }
+    break;
+#endif
 
   default:
     break;
@@ -422,7 +441,8 @@ obj_free(mrb_state *mrb, struct RBasic *obj)
     break;
 
   case MRB_TT_HASH:
-    mrb_gc_free_ht(mrb, (struct RClass*)obj);
+    mrb_gc_free_iv(mrb, (struct RObject*)obj);
+    mrb_gc_free_ht(mrb, (struct RHash*)obj);
     break;
 
   case MRB_TT_STRING:
@@ -441,7 +461,7 @@ obj_free(mrb_state *mrb, struct RBasic *obj)
         d->type->dfree(mrb, d->data);
       }
     }
-          break;
+    break;
 
   default:
     break;
@@ -530,13 +550,23 @@ gc_gray_mark(mrb_state *mrb, struct RBasic *obj)
     break;
 
   case MRB_TT_HASH:
-    children += mrb_gc_mark_ht_size(mrb, (struct RClass*)obj);
+    children += mrb_gc_mark_iv_size(mrb, (struct RObject*)obj);
+    children += mrb_gc_mark_ht_size(mrb, (struct RHash*)obj);
     break;
 
   case MRB_TT_PROC:
   case MRB_TT_RANGE:
     children+=2;
     break;
+
+#ifdef INCLUDE_REGEXP
+  case MRB_TT_MATCH:
+    children+=2;
+    break;
+  case MRB_TT_REGEX:
+    children+=1;
+    break;
+#endif
 
   default:
     break;

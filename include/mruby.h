@@ -68,7 +68,7 @@ typedef struct mrb_value {
     mrb_int i;
     mrb_sym sym;
   } value;
-  enum mrb_vtype tt;
+  enum mrb_vtype tt:8;
 } mrb_value;
 
 #define mrb_type(o)   (o).tt
@@ -300,8 +300,8 @@ mrb_value mrb_instance_new(mrb_state *mrb, mrb_value cv);
 struct RClass * mrb_class_new(mrb_state *mrb, struct RClass *super);
 struct RClass * mrb_module_new(mrb_state *mrb);
 struct RClass * mrb_class_from_sym(mrb_state *mrb, struct RClass *klass, mrb_sym name);
-struct RClass * mrb_class_get(mrb_state *mrb, char *name);
-struct RClass * mrb_class_obj_get(mrb_state *mrb, char *name);
+struct RClass * mrb_class_get(mrb_state *mrb, const char *name);
+struct RClass * mrb_class_obj_get(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method);
@@ -342,6 +342,7 @@ void *mrb_realloc(mrb_state*, void*, size_t);
 void *mrb_obj_alloc(mrb_state*, enum mrb_vtype, struct RClass*);
 void *mrb_free(mrb_state*, void*);
 
+mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len); /* mrb_str_new */
 mrb_value mrb_str_new_cstr(mrb_state*, const char*);
 
 mrb_state* mrb_open(void);
@@ -371,17 +372,6 @@ void mrb_gc_mark(mrb_state*,struct RBasic*);
 #define mrb_gc_mark_value(mrb,val) do {\
   if ((val).tt >= MRB_TT_OBJECT) mrb_gc_mark((mrb), mrb_object(val));\
 } while (0);
-void mrb_gc_mark_gv(mrb_state*);
-void mrb_gc_free_gv(mrb_state*);
-void mrb_gc_mark_iv(mrb_state*, struct RObject*);
-size_t mrb_gc_mark_iv_size(mrb_state*, struct RObject*);
-void mrb_gc_free_iv(mrb_state*, struct RObject*);
-void mrb_gc_mark_mt(mrb_state*, struct RClass*);
-size_t mrb_gc_mark_mt_size(mrb_state*, struct RClass*);
-void mrb_gc_free_mt(mrb_state*, struct RClass*);
-void mrb_gc_mark_ht(mrb_state*, struct RClass*);
-size_t mrb_gc_mark_ht_size(mrb_state*, struct RClass*);
-void mrb_gc_free_ht(mrb_state*, struct RClass*);
 void mrb_field_write_barrier(mrb_state *, struct RBasic*, struct RBasic*);
 #define mrb_field_write_barrier_value(mrb, obj, val) do{\
   if ((val.tt >= MRB_TT_OBJECT)) mrb_field_write_barrier((mrb), (obj), mrb_object(val));\
