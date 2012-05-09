@@ -543,7 +543,6 @@ flo_round(mrb_state *mrb, /*int argc, mrb_value *argv,*/ mrb_value num)
         number = d - (d - number >= 0.5);
     }
 
-    number = round(number);
     if (ndigits < 0) number *= f;
     else number /= f;
   }
@@ -1085,7 +1084,7 @@ fix_to_f(mrb_state *mrb, mrb_value num)
  */
 /* ------------------------------------------------------------------------*/
 static mrb_int
-flt2big(mrb_state *mrb, float d)
+flt2big(mrb_state *mrb, mrb_float d)
 {
   mrb_int z;
 
@@ -1100,7 +1099,7 @@ flt2big(mrb_state *mrb, float d)
 }
 
 mrb_value
-mrb_flt2big(mrb_state *mrb, float d)
+mrb_flt2big(mrb_state *mrb, mrb_float d)
 {
     return mrb_fixnum_value(flt2big(mrb, d));
 }

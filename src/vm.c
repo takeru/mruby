@@ -44,7 +44,7 @@ stack_init(mrb_state *mrb)
 static void
 stack_extend(mrb_state *mrb, int room, int keep)
 {
-  size_t size, off;
+  int size, off;
 
   if (mrb->stack + room > mrb->stend) {
     size = mrb->stend - mrb->stbase;
@@ -326,7 +326,10 @@ argnum_error(mrb_state *mrb, int num)
   (r).value.p = (void*)(v);\
 }
 
+#ifdef __GNUC__
 #define DIRECT_THREADED
+#endif
+
 #ifndef DIRECT_THREADED
 
 #define INIT_DISPACTH for (;;) { i = *pc; switch (GET_OPCODE(i)) {
@@ -1370,7 +1373,7 @@ mrb_run(mrb_state *mrb, struct RProc *proc, mrb_value self)
       }
       else {
         struct RArray *ary = mrb_ary_ptr(v);
-        size_t len = ary->len;
+        int len = ary->len;
         int i;
 
         if (len > pre + post) {

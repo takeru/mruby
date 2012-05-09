@@ -217,8 +217,12 @@ mrb_vm_define_class(mrb_state *mrb, mrb_value outer, mrb_value super, mrb_sym id
       mrb_check_type(mrb, super, MRB_TT_CLASS);
       s = mrb_class_ptr(super);
     }
+    if (!s) {
+      s = mrb->object_class;
+    }
     c = mrb_class_new(mrb, s);
     setup_class(mrb, outer, c, id);
+    mrb_funcall(mrb, mrb_obj_value(s), "inherited", 1, mrb_obj_value(c));
   }
 
   return c;
@@ -311,7 +315,7 @@ mrb_define_method_id(mrb_state *mrb, struct RClass *c, mrb_sym mid, mrb_func_t f
 void
 mrb_define_method(mrb_state *mrb, struct RClass *c, const char *name, mrb_func_t func, int aspec)
 {
-  return mrb_define_method_id(mrb, c, mrb_intern(mrb, name), func, aspec);
+  mrb_define_method_id(mrb, c, mrb_intern(mrb, name), func, aspec);
 }
 
 void
@@ -572,7 +576,7 @@ mrb_singleton_class(mrb_state *mrb, mrb_value v)
 void
 mrb_define_class_method(mrb_state *mrb, struct RClass *c, const char *name, mrb_func_t func, int aspec)
 {
-  return mrb_define_method_id(mrb, c->c, mrb_intern(mrb, name), func, aspec);
+  mrb_define_method_id(mrb, c->c, mrb_intern(mrb, name), func, aspec);
 }
 
 struct RProc*
@@ -1075,6 +1079,7 @@ mrb_init_class(mrb_state *mrb)
   mrb_define_method(mrb, bob, "!", mrb_bob_not, ARGS_NONE());
   mrb_define_method(mrb, bob, "method_missing", mrb_bob_missing, ARGS_ANY());     /* 15.3.1.3.30 */
   mrb_define_method(mrb, cls, "new", mrb_instance_new, ARGS_ANY());
+  mrb_define_method(mrb, cls, "inherited", mrb_bob_init, ARGS_REQ(1));
   mrb_define_method(mrb, mod, "include", mrb_mod_include, ARGS_REQ(1));
 
   mrb_define_method(mrb, mod, "to_s", mrb_mod_to_s, ARGS_NONE());

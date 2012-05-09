@@ -85,9 +85,9 @@ mrb_reg_s_new_instance(mrb_state *mrb, /*int argc, mrb_value *argv, */mrb_value 
   //mrb_obj_call_init(obj, argc, argv);...mrb_funcall2(obj, idInitialize, argc, argv);
   mrb_value argv[16];
   int argc;
+  struct RRegexp *re;
 
   mrb_get_args(mrb, "*", &argv, &argc);
-  struct RRegexp *re;
   re = mrb_obj_alloc(mrb, MRB_TT_REGEX, mrb->regex_class);
   re->ptr = 0;
   re->src = 0;
@@ -1861,12 +1861,16 @@ mrb_match_begin(mrb_state *mrb, mrb_value match/*, mrb_value n*/)
 {
   mrb_value argv[16];
   int argc;
-  mrb_get_args(mrb, "*", &argv, &argc);
   mrb_value n = argv[0];
-  int i = match_backref_number(mrb, match, n);
-  struct re_registers *regs = RMATCH_REGS(match);
+  int i;
+  struct re_registers *regs;
 
   match_check(mrb, match);
+  mrb_get_args(mrb, "*", &argv, &argc);
+  n = argv[0];
+  i = match_backref_number(mrb, match, n);
+  regs = RMATCH_REGS(match);
+
   if (i < 0 || regs->num_regs <= i)
     mrb_raise(mrb, E_INDEX_ERROR, "index %d out of matches", i);
 
@@ -1944,12 +1948,16 @@ mrb_match_end(mrb_state *mrb, mrb_value match/*, mrb_value n*/)
 {
   mrb_value argv[16];
   int argc;
-  mrb_get_args(mrb, "*", &argv, &argc);
-  mrb_value n = argv[0];
-  int i = match_backref_number(mrb, match, n);
-  struct re_registers *regs = RMATCH_REGS(match);
+  mrb_value n;
+  int i;
+  struct re_registers *regs;
 
   match_check(mrb, match);
+  mrb_get_args(mrb, "*", &argv, &argc);
+  n = argv[0];
+  i = match_backref_number(mrb, match, n);
+  regs = RMATCH_REGS(match);
+
   if (i < 0 || regs->num_regs <= i)
     mrb_raise(mrb, E_INDEX_ERROR, "index %d out of matches", i);
 
@@ -1968,9 +1976,10 @@ mrb_match_init_copy(mrb_state *mrb, mrb_value obj/*, mrb_value orig*/)
   mrb_value argv[16];
   int argc;
   struct rmatch *rm;
+  mrb_value orig;
 
   mrb_get_args(mrb, "*", &argv, &argc);
-  mrb_value orig = argv[0];
+  orig = argv[0];
 
   if (mrb_obj_equal(mrb, obj, orig)) return obj;
 
@@ -1998,7 +2007,7 @@ mrb_match_init_copy(mrb_state *mrb, mrb_value obj/*, mrb_value orig*/)
           rm->char_offset_num_allocated = rm->regs.num_regs;
       }
       memcpy(rm->char_offset, RMATCH(orig)->rmatch->char_offset,
-             sizeof(struct rmatch_offset)* rm->regs.num_regs);
+             sizeof(struct rmatch_offset) * rm->regs.num_regs);
       rm->char_offset_updated = 1;
   }
 
@@ -2050,11 +2059,12 @@ mrb_match_offset(mrb_state *mrb, mrb_value match/*, mrb_value n*/)
 {
   mrb_value n;
   struct re_registers *regs = RMATCH_REGS(match);
-
-  mrb_get_args(mrb, "o", &n);
-  int i = match_backref_number(mrb, match, n);
+  int i;
 
   match_check(mrb, match);
+  mrb_get_args(mrb, "o", &n);
+  i = match_backref_number(mrb, match, n);
+
   if (i < 0 || regs->num_regs <= i)
     mrb_raise(mrb, E_INDEX_ERROR, "index %d out of matches", i);
 
