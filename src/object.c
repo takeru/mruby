@@ -9,7 +9,6 @@
 #include "mruby/string.h"
 #include <stdio.h>
 #include "mruby/class.h"
-#include "method.h"
 #include "mruby/numeric.h"
 
 #ifdef INCLUDE_REGEXP
@@ -565,8 +564,7 @@ mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
   switch (mrb_type(val)) {
     case MRB_TT_FLOAT:
       if (base != 0) goto arg_error;
-      if (mrb_float(val) <= (double)FIXNUM_MAX
-          && mrb_float(val) >= (double)FIXNUM_MIN) {
+      if (FIXABLE(mrb_float(val))) {
           break;
       }
       return mrb_flt2big(mrb, mrb_float(val));

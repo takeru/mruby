@@ -12,6 +12,7 @@ RLIB := $(TARGET).rbtmp
 DEPLIB := $(TARGET).d
 MRB1 := $(BASEDIR)/*.rb
 MRBS := $(MRB1)
+LIBR0 := ../lib/libmruby_core.a
 LIBR := ../lib/libmruby.a
 
 # C compiler (gcc)
@@ -43,9 +44,12 @@ endif
 # generic build targets, rules
 
 .PHONY : all
-all : $(MRBC) $(MLIB)
+all : $(LIBR)
+
+# update libmruby.a
+$(LIBR) : $(MLIB) $(LIBR0)
+	cp $(LIBR0) $(LIBR)
 	$(AR) r $(LIBR) $(MLIB)
-	@echo "make: built targets of `pwd`"
 
 # Compile mrblib source
 $(MLIB) : $(CLIB)
@@ -66,5 +70,4 @@ $(RLIB) : $(MRBS)
 .PHONY : clean
 clean :
 	@echo "make: removing targets, objects and depend files of `pwd`"
-	-rm -f $(MRBC) $(MLIB) $(CLIB) $(RLIB) $(DLIB) $(DEPLIB)
-
+	-rm -f $(MRBC) $(MLIB) $(CLIB) $(RLIB) $(DLIB) $(DEPLIB) $(LIBR)

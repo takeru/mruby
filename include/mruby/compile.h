@@ -4,6 +4,13 @@
 ** See Copyright Notice in mruby.h
 */
 
+#ifndef MRUBY_COMPILE_H
+#define MRUBY_COMPILE_H 1
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include "mruby.h"
 #include <stdio.h>
 #include <setjmp.h>
@@ -12,8 +19,6 @@ typedef struct mrb_ast_node {
   struct mrb_ast_node *car, *cdr;
 } mrb_ast_node;
 
-#include "node.h"
-#include "pool.h"
 #include <stdio.h>
 
 enum mrb_lex_state_enum {
@@ -77,15 +82,24 @@ struct mrb_parser_state {
   jmp_buf jmp;
 };
 
+/* parser structure */
+struct mrb_parser_state* mrb_parser_new(mrb_state*);
+const char *mrb_parser_filename(struct mrb_parser_state*, const char*);
+int mrb_parser_lineno(struct mrb_parser_state*, int);
+void mrb_parser_parse(struct mrb_parser_state*);
+
+/* utility functions */
 struct mrb_parser_state* mrb_parse_file(mrb_state*,FILE*);
 struct mrb_parser_state* mrb_parse_string(mrb_state*,const char*);
 struct mrb_parser_state* mrb_parse_nstring(mrb_state*,const char*,size_t);
-struct mrb_parser_state* mrb_parse_nstring_ext(mrb_state*,const char*,size_t);
 int mrb_generate_code(mrb_state*, mrb_ast_node*);
 
 int mrb_compile_file(mrb_state*,FILE*);
 int mrb_compile_string(mrb_state*,char*);
 int mrb_compile_nstring(mrb_state*,char*,size_t);
 
-const char *mrb_parser_filename(struct mrb_parser_state *p, const char *s);
-int mrb_parser_lineno(struct mrb_parser_state *p, int n);
+#if defined(__cplusplus)
+}  /* extern "C" { */
+#endif
+
+#endif /* MRUBY_COMPILE_H */

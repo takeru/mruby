@@ -5,7 +5,7 @@
 # extension of the executable-file is modifiable(.exe .out ...)
 BASEDIR := ../../src
 TARGET := ../../bin/mrbc
-LIBR := ../../lib/libmruby.a
+LIBR := ../../lib/libmruby_core.a
 ifeq ($(OS),Windows_NT)
 EXE := $(TARGET).exe
 else
@@ -44,7 +44,6 @@ endif
 
 .PHONY : all
 all : $(EXE)
-	@echo "make: built targets of `pwd`"
 
 # executable constructed using linker from object files
 $(EXE) : $(OBJS) $(LIBR)

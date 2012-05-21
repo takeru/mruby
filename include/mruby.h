@@ -28,6 +28,10 @@
 #ifndef MRUBY_H
 #define MRUBY_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include <stdlib.h>
 #include "mrbconf.h"
 
@@ -77,13 +81,13 @@ typedef struct mrb_value {
 #define mrb_fixnum(o) (o).value.i
 #define mrb_float(o)  (o).value.f
 #define mrb_symbol(o) (o).value.sym
-#define mrb_object(o) (o).value.p
+#define mrb_object(o) ((struct RBasic *) (o).value.p)
 #define FIXNUM_P(o)   ((o).tt == MRB_TT_FIXNUM)
 #define UNDEF_P(o)    ((o).tt == MRB_TT_UNDEF)
 
 #include "mruby/object.h"
 
-#define IMMEDIATE_P(x) ((mrb_type(x) >= MRB_TT_FALSE) && (mrb_type(x) <= MRB_TT_FLOAT))
+#define IMMEDIATE_P(x) (mrb_type(x) <= MRB_TT_FLOAT)
 #define SPECIAL_CONST_P(x) IMMEDIATE_P(x)
 #define SYMBOL_P(o) (mrb_type(o) == MRB_TT_SYMBOL)
 #define RTEST(o) mrb_test(o)
@@ -241,15 +245,6 @@ typedef struct mrb_state {
   struct RClass *string_class;
   struct RClass *array_class;
   struct RClass *hash_class;
-  struct RClass *range_class;
-#ifdef INCLUDE_REGEXP
-  struct RClass *regex_class;
-  struct RClass *match_class;
-#endif
-#ifdef INCLUDE_ENCODING
-  struct RClass *encode_class;
-  struct RClass *converter_class;
-#endif
 
   struct RClass *float_class;
   struct RClass *fixnum_class;
@@ -278,7 +273,9 @@ typedef struct mrb_state {
   mrb_sym symidx;
   struct kh_n2s *name2sym;      /* symbol table */
   struct kh_s2n *sym2name;      /* reverse symbol table */
+#ifdef INCLUDE_REGEXP
   struct RNode *local_svar;/* regexp */
+#endif
 
   struct RClass *eException_class;
   struct RClass *eStandardError_class;
@@ -294,7 +291,8 @@ void mrb_include_module(mrb_state*, struct RClass*, struct RClass*);
 
 void mrb_define_method(mrb_state*, struct RClass*, const char*, mrb_func_t,int);
 void mrb_define_class_method(mrb_state *, struct RClass *, const char *, mrb_func_t, int);
-void mrb_define_singleton_method(mrb_state*, void*, const char*, mrb_func_t,int);
+void mrb_define_singleton_method(mrb_state*, struct RObject*, const char*, mrb_func_t,int);
+void mrb_define_module_function(mrb_state*, struct RClass*, const char*, mrb_func_t,int);
 void mrb_define_const(mrb_state*, struct RClass*, const char *name, mrb_value);
 mrb_value mrb_instance_new(mrb_state *mrb, mrb_value cv);
 struct RClass * mrb_class_new(mrb_state *mrb, struct RClass *super);
@@ -339,7 +337,7 @@ mrb_value mrb_str_format(mrb_state *, int, const mrb_value *, mrb_value);
 void *mrb_malloc(mrb_state*, size_t);
 void *mrb_calloc(mrb_state*, size_t, size_t);
 void *mrb_realloc(mrb_state*, void*, size_t);
-void *mrb_obj_alloc(mrb_state*, enum mrb_vtype, struct RClass*);
+struct RBasic *mrb_obj_alloc(mrb_state*, enum mrb_vtype, struct RClass*);
 void *mrb_free(mrb_state*, void*);
 
 mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len); /* mrb_str_new */
@@ -589,5 +587,17 @@ mrb_value mrb_block_proc(void);
 int mrb_sourceline(void);
 void ruby_default_signal(int sig);
 mrb_value mrb_attr_get(mrb_state *mrb, mrb_value obj, mrb_sym id);
+
+/* memory pool implementation */
+typedef struct mrb_pool mrb_pool;
+struct mrb_pool* mrb_pool_open(mrb_state*);
+void mrb_pool_close(struct mrb_pool*);
+void* mrb_pool_alloc(struct mrb_pool*, size_t);
+void* mrb_pool_realloc(struct mrb_pool*, void*, size_t oldlen, size_t newlen);
+int mrb_pool_can_realloc(struct mrb_pool*, void*, size_t);
+
+#if defined(__cplusplus)
+}  /* extern "C" { */
+#endif
 
 #endif  /* MRUBY_H */

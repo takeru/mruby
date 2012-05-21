@@ -8,25 +8,28 @@
 #define CODEGEN_DUMP
 
 #include "mruby.h"
-#include "mruby/irep.h"
-#include "compile.h"
-#include "mruby/proc.h"
-#include "opcode.h"
 #include "mruby/string.h"
+#include "mruby/irep.h"
+#include "mruby/proc.h"
+#include "mruby/compile.h"
+#include "opcode.h"
+#include "node.h"
 #include <string.h>
 #include <stdlib.h>
 
 typedef mrb_ast_node node;
 typedef struct mrb_parser_state parser_state;
 
+enum looptype {
+  LOOP_NORMAL,
+  LOOP_BLOCK,
+  LOOP_FOR,
+  LOOP_BEGIN,
+  LOOP_RESCUE,
+} type;
+
 struct loopinfo {
-  enum looptype {
-    LOOP_NORMAL,
-    LOOP_BLOCK,
-    LOOP_FOR,
-    LOOP_BEGIN,
-    LOOP_RESCUE,
-  } type;
+  enum looptype type;
   int pc1, pc2, pc3, acc;
   int ensure_level;
   struct loopinfo *prev;
@@ -523,7 +526,7 @@ scope_body(codegen_scope *s, node *tree)
   int idx = scope->idx;
 
   if (!s->iseq) {
-    codegen(scope, tree->cdr, NOVAL);
+    codegen(scope, tree->cdr, VAL);
     genop(scope, MKOP_A(OP_STOP, 0));
   }
   else {
@@ -1477,11 +1480,27 @@ codegen(codegen_scope *s, node *tree, int val)
     break;
 
   case NODE_BACK_REF:
-    codegen(s, tree, VAL);
+    {
+      char buf[4];
+      int sym;
+
+      snprintf(buf, 3, "$%c", (int)(intptr_t)tree);
+      sym = new_sym(s, mrb_intern(s->mrb, buf));
+      genop(s, MKOP_ABx(OP_GETGLOBAL, cursp(), sym));
+      push();
+    }
     break;
 
   case NODE_NTH_REF:
-    codegen(s, tree, VAL);
+    {
+      char buf[4];
+      int sym;
+
+      snprintf(buf, 3, "$%d", (int)(intptr_t)tree);
+      sym = new_sym(s, mrb_intern(s->mrb, buf));
+      genop(s, MKOP_ABx(OP_GETGLOBAL, cursp(), sym));
+      push();
+    }
     break;
 
   case NODE_ARG:

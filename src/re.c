@@ -20,6 +20,9 @@
 #include "error.h"
 #ifdef INCLUDE_REGEXP
 
+#define REGEX_CLASS (mrb_class_obj_get(mrb, "Regexp"))
+#define MATCH_CLASS (mrb_class_obj_get(mrb, "MatchData"))
+
 //from opcode.h
 #define GETARG_A(i)   ((((mrb_code)(i)) >> 24) & 0xff)
 #define GETARG_B(i)   ((((mrb_code)(i)) >> 16) & 0xff)
@@ -51,14 +54,11 @@ unsigned long ruby_scan_oct(const char *, size_t, size_t *);
 unsigned long ruby_scan_hex(const char *, size_t, size_t *);
 
 static mrb_value mrb_match_to_a(mrb_state *mrb, mrb_value match);
-int re_adjust_startpos(struct re_pattern_buffer *bufp, const char *string, int size, int startpos, int range);
 static mrb_value mrb_reg_preprocess(mrb_state *mrb, const char *p, const char *end, mrb_encoding *enc,
         mrb_encoding **fixed_enc, onig_errmsg_buffer err);
 static void mrb_reg_expr_str(mrb_state *mrb, mrb_value str, const char *s, long len,
       mrb_encoding *enc, mrb_encoding *resenc);
 static char * option_to_str(char str[4], int options);
-mrb_value match_alloc(mrb_state *mrb);
-void mrb_warn(const char *fmt, ...);
 
 static mrb_value reg_cache;
 //static int may_need_recompile;
@@ -88,7 +88,7 @@ mrb_reg_s_new_instance(mrb_state *mrb, /*int argc, mrb_value *argv, */mrb_value 
   struct RRegexp *re;
 
   mrb_get_args(mrb, "*", &argv, &argc);
-  re = mrb_obj_alloc(mrb, MRB_TT_REGEX, mrb->regex_class);
+  re = (struct RRegexp *) mrb_obj_alloc(mrb, MRB_TT_REGEX, REGEX_CLASS);
   re->ptr = 0;
   re->src = 0;
   re->usecnt = 0;
@@ -1665,9 +1665,7 @@ match_alloc(mrb_state *mrb)
 {
   struct RMatch* m;
 
-  m = mrb_obj_alloc(mrb, MRB_TT_MATCH, mrb->match_class);
-  //  NEWOBJ(match, struct RMatch);
-  //  OBJSETUP(match, klass, T_MATCH);
+  m = (struct RMatch *) mrb_obj_alloc(mrb, MRB_TT_MATCH, MATCH_CLASS);
 
   m->str    = 0;
   m->rmatch = 0;
@@ -2455,7 +2453,7 @@ mrb_reg_s_alloc(mrb_state *mrb, mrb_value dummy)
 
   //NEWOBJ(re, struct RRegexp);
   //OBJSETUP(re, klass, T_REGEXP);
-  re = mrb_obj_alloc(mrb, MRB_TT_REGEX, mrb->regex_class);
+  re = (struct RRegexp *) mrb_obj_alloc(mrb, MRB_TT_REGEX, REGEX_CLASS);
 
   re->ptr = 0;
   re->src = 0;
@@ -2626,10 +2624,8 @@ void
 mrb_init_regexp(mrb_state *mrb)
 {
   struct RClass *s;
-    s = mrb->regex_class = mrb_define_class(mrb, "Regexp", mrb->object_class);
+  s = mrb_define_class(mrb, "Regexp", mrb->object_class);
 
-    //mrb->encode_class = mrb_define_class(mrb, "Encoding", mrb->object_class);
-    //mrb_define_alloc_func(mrb, s, mrb_reg_s_alloc);
     mrb_define_class_method(mrb, s, "compile",         mrb_reg_s_new_instance, ARGS_ANY());              /* 15.2.15.6.1  */
     mrb_define_class_method(mrb, s, "escape",          mrb_reg_s_quote,        ARGS_REQ(1));             /* 15.2.15.6.2  */
     mrb_define_class_method(mrb, s, "last_match",      mrb_reg_s_last_match,   ARGS_ANY());              /* 15.2.15.6.3  */
@@ -2667,7 +2663,7 @@ mrb_init_regexp(mrb_state *mrb)
 
     //mrb_global_variable(&reg_cache);
 
-    s = mrb->match_class = mrb_define_class(mrb, "MatchData", mrb->object_class);
+    s = mrb_define_class(mrb, "MatchData", mrb->object_class);
     //mrb_undef_method(CLASS_OF(rb_cMatch), "new");
 
     mrb_define_method(mrb, s, "[]",              mrb_match_aref,        ARGS_ANY());                     /* 15.2.16.3.1  */

@@ -84,12 +84,6 @@ enum {
 
 #define mrb_usascii_str_new2 mrb_usascii_str_new_cstr
 
-static size_t
-enc_memsize(mrb_state *mrb, const void *p)
-{
-    return 0;
-}
-
 static const struct mrb_data_type encoding_data_type = {
   "encoding", 0,
 };
@@ -103,7 +97,7 @@ static const struct mrb_data_type encoding_data_type = {
 static mrb_value
 enc_new(mrb_state *mrb, mrb_encoding *encoding)
 {
-    return mrb_obj_value(Data_Wrap_Struct(mrb, mrb->encode_class, &encoding_data_type, encoding));
+    return mrb_obj_value(Data_Wrap_Struct(mrb, ENCODE_CLASS, &encoding_data_type, encoding));
 }
 
 #define enc_autoload_p(enc) (!mrb_enc_mbmaxlen(enc))
@@ -919,11 +913,11 @@ enc_name(mrb_state *mrb, mrb_value self)
 
 struct fn_arg {
   mrb_state *mrb;
-  int (*func)(ANYARGS);
+  enum st_retval (*func)(ANYARGS);
   void *a;
 };
 
-static int
+static enum st_retval
 fn_i(st_data_t key, st_data_t val, st_data_t arg) {
   struct fn_arg *a = (struct fn_arg*)arg;
 
@@ -931,7 +925,7 @@ fn_i(st_data_t key, st_data_t val, st_data_t arg) {
 }
 
 static int
-st_foreachNew(mrb_state *mrb, st_table *tbl, int (*func)(ANYARGS), void *a)
+st_foreachNew(mrb_state *mrb, st_table *tbl, enum st_retval (*func)(ANYARGS), void *a)
 {
   struct fn_arg arg = {
     mrb,
@@ -942,7 +936,7 @@ st_foreachNew(mrb_state *mrb, st_table *tbl, int (*func)(ANYARGS), void *a)
   return st_foreach(tbl, fn_i, (st_data_t)&arg);
 }
 
-static int
+static enum st_retval
 enc_names_i(mrb_state *mrb, st_data_t name, st_data_t idx, st_data_t args)
 {
   mrb_value *arg = (mrb_value *)args;
@@ -1139,7 +1133,7 @@ mrb_usascii_encindex(void)
 int
 mrb_locale_encindex(mrb_state *mrb)
 {
-    mrb_value charmap = mrb_locale_charmap(mrb, mrb_obj_value(mrb->encode_class));
+    mrb_value charmap = mrb_locale_charmap(mrb, mrb_obj_value(ENCODE_CLASS));
     int idx;
 
     if (mrb_nil_p(charmap))
@@ -1493,7 +1487,7 @@ set_encoding_const(mrb_state *mrb, const char *name, mrb_encoding *enc)
     if (s - name > ENCODING_NAMELEN_MAX) return;
     valid = 1;
     //mrb_define_const(mrb_cEncoding, name, encoding);
-    mrb_define_const(mrb, mrb->encode_class, name, encoding);
+    mrb_define_const(mrb, ENCODE_CLASS, name, encoding);
   }
   if (!valid || haslower) {
     size_t len = s - name;
@@ -1516,18 +1510,18 @@ set_encoding_const(mrb_state *mrb, const char *name, mrb_encoding *enc)
         if (!ISALNUM(*s)) *s = '_';
       }
       if (hasupper) {
-        mrb_define_const(mrb, mrb->encode_class, name, encoding);
+        mrb_define_const(mrb, ENCODE_CLASS, name, encoding);
       }
     }
     if (haslower) {
       for (s = (char *)name; *s; ++s) {
       if (ISLOWER(*s)) *s = ONIGENC_ASCII_CODE_TO_UPPER_CASE((int)*s);
       }
-      mrb_define_const(mrb, mrb->encode_class, name, encoding);
+      mrb_define_const(mrb, ENCODE_CLASS, name, encoding);
     }
   }
 }
-static int
+static enum st_retval
 mrb_enc_name_list_i(mrb_state *mrb, st_data_t name, st_data_t idx, mrb_value *arg)
 {
     mrb_value ary = *arg;
@@ -1560,7 +1554,7 @@ mrb_enc_name_list(mrb_state *mrb, mrb_value klass)
     return ary;
 }
 
-static int
+static enum st_retval
 mrb_enc_aliases_enc_i(mrb_state *mrb, st_data_t name, st_data_t orig, st_data_t arg)
 {
     mrb_value *p = (mrb_value *)arg;
@@ -1617,7 +1611,7 @@ mrb_init_encoding(mrb_state *mrb)
   int i;
   struct RClass *s;
 
-  s = mrb->encode_class = mrb_define_class(mrb, "Encoding", mrb->object_class);
+  s = mrb_define_class(mrb, "Encoding", mrb->object_class);
   //mrb_undef_alloc_func(mrb_cEncoding);
   //mrb_undef_method(CLASS_OF(mrb_cEncoding), "new");
   mrb_define_class_method(mrb, s, "aliases",           mrb_enc_aliases,        ARGS_NONE()); /* 15.2.40.2.1  */

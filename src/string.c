@@ -47,7 +47,6 @@ static mrb_value str_replace(mrb_state *mrb, mrb_value str, mrb_value str2);
 #ifdef INCLUDE_ENCODING
 static long str_strlen(mrb_state *mrb, mrb_value str, mrb_encoding *enc);
 #endif //INCLUDE_ENCODING
-int mrb_block_given_p();
 #ifdef INCLUDE_ENCODING
 #define is_ascii_string(mrb, str) (mrb_enc_str_coderange(mrb, str) == ENC_CODERANGE_7BIT)
 #define is_broken_string(mrb, str) (mrb_enc_str_coderange(mrb, str) == ENC_CODERANGE_BROKEN)
@@ -231,8 +230,6 @@ str_independent(mrb_value str)
 static inline void
 str_enc_copy(mrb_state *mrb, mrb_value str1, mrb_value str2)
 {
-  unsigned int tmp;
-  tmp = ENCODING_GET_INLINED(str2);
   mrb_enc_set_index(mrb, str1, ENCODING_GET(mrb, str2));
 }
 
@@ -294,12 +291,14 @@ mrb_str_capacity(mrb_value str)
 }
 #endif //INCLUDE_ENCODING
 
+#define mrb_obj_alloc_string(mrb) ((struct RString *) mrb_obj_alloc((mrb), MRB_TT_STRING, (mrb)->string_class))
+
 static inline mrb_value
 str_alloc(mrb_state *mrb)
 {
   struct RString* s;
 
-  s = mrb_obj_alloc(mrb, MRB_TT_STRING, mrb->string_class);
+  s = mrb_obj_alloc_string(mrb);
   //NEWOBJ(str, struct RString);
   //OBJSETUP(str, klass, T_STRING);
 
@@ -483,7 +482,7 @@ str_new4(mrb_state *mrb, mrb_value str)
 {
   mrb_value str2;
 
-  str2 = mrb_obj_value(mrb_obj_alloc(mrb, MRB_TT_STRING, mrb->string_class));
+  str2 = mrb_obj_value(mrb_obj_alloc_string(mrb));
   RSTRING(str2)->len = RSTRING_LEN(str);
   RSTRING(str2)->buf = RSTRING_PTR(str);
 
@@ -540,7 +539,7 @@ mrb_str_buf_new(mrb_state *mrb, size_t capa)
 {
   struct RString *s;
 
-  s = mrb_obj_alloc(mrb, MRB_TT_STRING, mrb->string_class);
+  s = mrb_obj_alloc_string(mrb);
 
   if (capa < STR_BUF_MIN_SIZE) {
     capa = STR_BUF_MIN_SIZE;
@@ -610,7 +609,7 @@ mrb_str_new(mrb_state *mrb, const char *p, size_t len)
   if (len == 0) {
     return mrb_str_buf_new(mrb, len);
   }
-  s = mrb_obj_alloc(mrb, MRB_TT_STRING, mrb->string_class);
+  s = mrb_obj_alloc_string(mrb);
   s->buf = mrb_malloc(mrb, len+1);
   if (p) {
     memcpy(s->buf, p, len);
@@ -658,7 +657,7 @@ mrb_str_new_cstr(mrb_state *mrb, const char *p)
   struct RString *s;
   size_t len = strlen(p);
 
-  s = mrb_obj_alloc(mrb, MRB_TT_STRING, mrb->string_class);
+  s = mrb_obj_alloc_string(mrb);
   s->buf = mrb_malloc(mrb, len+1);
   memcpy(s->buf, p, len);
   s->buf[len] = 0;
@@ -1068,13 +1067,11 @@ mrb_str_to_str(mrb_state *mrb, mrb_value str)
 mrb_value
 mrb_string_value(mrb_state *mrb, mrb_value *ptr)
 {
-  struct RString *ps;
   mrb_value s = *ptr;
   if (mrb_type(s) != MRB_TT_STRING) {
     s = mrb_str_to_str(mrb, s);
     *ptr = s;
   }
-  ps = mrb_str_ptr(s);
   return s;
 }
 
@@ -1425,7 +1422,7 @@ mrb_str_dup(mrb_state *mrb, mrb_value str)
   struct RString *s = mrb_str_ptr(str);
   struct RString *dup;
 
-  dup = mrb_obj_alloc(mrb, MRB_TT_STRING, mrb->string_class);
+  dup = mrb_obj_alloc_string(mrb);
   dup->buf = mrb_malloc(mrb, s->len+1);
   if (s->buf) {
     memcpy(dup->buf, s->buf, s->len);
@@ -2450,8 +2447,7 @@ str_gsub(mrb_state *mrb, mrb_value str, mrb_int bang)
   struct re_registers *regs;
   mrb_int beg, n;
   mrb_int beg0, end0;
-  mrb_int offset, blen, slen, len, last;
-  int iter = 0;
+  mrb_int offset, blen, len, last;
   char *sp, *cp;
   mrb_encoding *str_enc;
 
@@ -2459,7 +2455,6 @@ str_gsub(mrb_state *mrb, mrb_value str, mrb_int bang)
   switch (argc) {
     case 1:
       /*RETURN_ENUMERATOR(str, argc, argv);*/
-      iter = 1;
       break;
     case 2:
       repl = argv[1];
@@ -2481,7 +2476,6 @@ str_gsub(mrb_state *mrb, mrb_value str, mrb_int bang)
   blen = RSTRING_LEN(str) + 30;
   dest = mrb_str_buf_new(mrb, blen);
   sp = RSTRING_PTR(str);
-  slen = RSTRING_LEN(str);
   cp = sp;
   str_enc = STR_ENC_GET(mrb, str);
 
@@ -3703,12 +3697,11 @@ mrb_str_sub_bang(mrb_state *mrb, mrb_value str)
   mrb_value *argv;
   int argc;
   mrb_value pat, repl;
-  int iter = 0;
   long plen;
 
   mrb_get_args(mrb, "*", &argv, &argc);
   if (argc == 1 && mrb_block_given_p()) {
-    iter = 1;
+    /* do nothing */
   }
   else if (argc == 2) {
     repl = argv[1];
@@ -4063,7 +4056,6 @@ mrb_str_to_i(mrb_state *mrb, mrb_value self)
 double
 mrb_cstr_to_dbl(mrb_state *mrb, const char * p, int badcheck)
 {
-  const char *q;
   char *end;
   double d;
 //  const char *ellipsis = "";
@@ -4075,7 +4067,6 @@ mrb_cstr_to_dbl(mrb_state *mrb, const char * p, int badcheck)
       (w = (int)(end - p), ellipsis = ""))
 
   if (!p) return 0.0;
-  q = p;
   while (ISSPACE(*p)) p++;
 
   if (!badcheck && p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {

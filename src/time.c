@@ -26,8 +26,13 @@
 /* #define NO_GMTIME_R */
 
 #ifdef _WIN32
-/* unfortunately Win32 platform do not provide gmtime_r/localtime_r */
+/* Win32 platform do not provide gmtime_r/localtime_r; emulate them using gmtime_s/localtime_s */
+#if _MVC_VER
+#define gmtime_r(tp, tm)    ((gmtime_s((tm), (tp)) == 0) ? (tm) : NULL)
+#define localtime_r(tp, tm)    ((localtime_s((tm), (tp)) == 0) ? (tm) : NULL)
+#else
 #define NO_GMTIME_R
+#endif
 #endif
 
 /* timegm(3) */
@@ -261,8 +266,7 @@ time_mktime(mrb_state *mrb, mrb_int ayear, mrb_int amonth, mrb_int aday,
 static mrb_value
 mrb_time_gm(mrb_state *mrb, mrb_value self)
 { 
-  mrb_int ayear = 0.0, amonth = 1.0, aday = 1.0, ahour = 0.0, 
-  amin = 0.0, asec = 0.0, ausec = 0.0;
+  mrb_int ayear = 0, amonth = 1, aday = 1, ahour = 0, amin = 0, asec = 0, ausec = 0;
 
   mrb_get_args(mrb, "iiiiiii",
                 &ayear, &amonth, &aday, &ahour, &amin, &asec, &ausec);
@@ -276,10 +280,9 @@ mrb_time_gm(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_time_local(mrb_state *mrb, mrb_value self)
 { 
-  mrb_float ayear = 0.0, amonth = 1.0, aday = 1.0, ahour = 0.0, 
-  amin = 0.0, asec = 0.0, ausec = 0.0;
+  mrb_int ayear = 0, amonth = 1, aday = 1, ahour = 0, amin = 0, asec = 0, ausec = 0;
 
-  mrb_get_args(mrb, "fffffff",
+  mrb_get_args(mrb, "iiiiiii",
                 &ayear, &amonth, &aday, &ahour, &amin, &asec, &ausec);
   return mrb_time_wrap(mrb, mrb_class_ptr(self),
 		       time_mktime(mrb, ayear, amonth, aday, ahour, amin, asec, ausec, MRB_TIMEZONE_LOCAL));
