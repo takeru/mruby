@@ -28,7 +28,7 @@ static struct st_hash_type type_numhash = {
     numhash,
 };
 
-extern int strcmp(const char *, const char *);
+//extern int strcmp(const char *, const char *);
 static st_index_t strhash(const char *);
 static struct st_hash_type type_strhash = {
     strcmp,
