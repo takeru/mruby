@@ -15,29 +15,18 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifndef FALSE
-#define FALSE   0
-#endif
-
-#ifndef TRUE
-#define TRUE    1
-#endif
-
 #ifndef OTHER
 #define OTHER 2
 #endif
 
 #define RANGE_CLASS (mrb_class_obj_get(mrb, "Range"))
 
-mrb_value mrb_exec_recursive_paired(mrb_state *mrb, mrb_value (*func) (mrb_state *, mrb_value, mrb_value, int),
-                                  mrb_value obj, mrb_value paired_obj, void* arg);
-
 mrb_value
 mrb_range_new(mrb_state *mrb, mrb_value beg, mrb_value end, int excl)
 {
   struct RRange *r;
 
-  r = (struct RRange *) mrb_obj_alloc(mrb, MRB_TT_RANGE, RANGE_CLASS);
+  r = (struct RRange*)mrb_obj_alloc(mrb, MRB_TT_RANGE, RANGE_CLASS);
   r->edges = mrb_malloc(mrb, sizeof(struct mrb_range_edges));
   r->edges->beg = beg;
   r->edges->end = end;
@@ -122,8 +111,6 @@ range_init(mrb_state *mrb, mrb_value range, mrb_value beg, mrb_value end, mrb_in
   if ((mrb_type(beg) != MRB_TT_FIXNUM) || (mrb_type(end) != MRB_TT_FIXNUM)) {
     args[0] = beg;
     args[1] = end;
-    /* eroor.c v = mrb_rescue(range_check, (mrb_value)args, range_failed, 0);
-    if (mrb_nil_p(v)) range_failed(); */
     if (!range_check(mrb, args)) {
       printf("range_failed()\n");
     }
@@ -204,11 +191,6 @@ r_le(mrb_state *mrb, mrb_value a, mrb_value b)
 
   if (mrb_nil_p(r)) return FALSE;
 
-  /* mrb_value -> int */
-  //c = mrb_cmpint(mrb, r, a, b);
-  //if (c == 0) return TRUE;
-  //if (c < 0) return TRUE;
-  //return FALSE;
   if (mrb_obj_equal(mrb, r, mrb_fixnum_value(0))) return TRUE;
   if (mrb_obj_equal(mrb, r, mrb_fixnum_value(-1))) return TRUE;
   return FALSE;
@@ -223,10 +205,6 @@ r_gt(mrb_state *mrb, mrb_value a, mrb_value b)
 
   if (mrb_nil_p(r)) return FALSE;
 
-  /* mrb_value -> int */
-  //c = mrb_cmpint(mrb, r);
-  //if (c > 0) return TRUE;
-  //return FALSE;
   if (mrb_obj_equal(mrb, r, mrb_fixnum_value(1))) return TRUE;
   return FALSE;
 }
@@ -240,11 +218,6 @@ r_ge(mrb_state *mrb, mrb_value a, mrb_value b)
 
   if (mrb_nil_p(r)) return FALSE;
 
-  /* mrb_value -> int */
-  //c = mrb_cmpint(mrb, r);
-  //if (c == 0) return TRUE;
-  //if (c > 0)  return TRUE;
-  //return FALSE;
   if (mrb_obj_equal(mrb, r, mrb_fixnum_value(0))) return TRUE;
   if (mrb_obj_equal(mrb, r, mrb_fixnum_value(1))) return TRUE;
   return FALSE;
@@ -397,23 +370,6 @@ range_inspect(mrb_state *mrb, mrb_value range)
     return inspect_range(mrb, range, range, 0);
 }
 
-static mrb_value
-recursive_eql(mrb_state *mrb, mrb_value range, mrb_value obj, int recur)
-{
-  struct RRange *r = mrb_range_ptr(range);
-  struct RRange *o = mrb_range_ptr(obj);
-
-  if (recur) return mrb_true_value(); /* Subtle! */
-  if (!mrb_eql(mrb, r->edges->beg, o->edges->beg))
-    return mrb_false_value();
-  if (!mrb_eql(mrb, r->edges->end, o->edges->end))
-    return mrb_false_value();
-
-  if (r->excl != o->excl)
-    return mrb_false_value();
-  return mrb_true_value();
-}
-
 /* 15.2.14.4.14(x) */
 /*
  *  call-seq:
@@ -433,13 +389,24 @@ static mrb_value
 range_eql(mrb_state *mrb, mrb_value range)
 {
   mrb_value obj;
-  mrb_get_args(mrb, "o", &obj);
+  struct RRange *r, *o;
 
+  mrb_get_args(mrb, "o", &obj);
   if (mrb_obj_equal(mrb, range, obj))
     return mrb_true_value();
   if (!mrb_obj_is_kind_of(mrb, obj, RANGE_CLASS))
     return mrb_false_value();
-  return mrb_exec_recursive_paired(mrb, recursive_eql, range, obj, &obj);
+
+  r = mrb_range_ptr(range);
+  if (obj.tt != MRB_TT_RANGE) return mrb_false_value();
+  o = mrb_range_ptr(obj);
+  if (!mrb_eql(mrb, r->edges->beg, o->edges->beg))
+    return mrb_false_value();
+  if (!mrb_eql(mrb, r->edges->end, o->edges->end))
+    return mrb_false_value();
+  if (r->excl != o->excl)
+    return mrb_false_value();
+  return mrb_true_value();
 }
 
 /* 15.2.14.4.15(x) */
@@ -447,16 +414,17 @@ mrb_value
 range_initialize_copy(mrb_state *mrb, mrb_value copy)
 {
   mrb_value src;
+
   mrb_get_args(mrb, "o", &src);
 
-    if (mrb_obj_equal(mrb, copy, src)) return copy;
-    //mrb_check_frozen(copy);
-    if (!mrb_obj_is_instance_of(mrb, src, mrb_obj_class(mrb, copy))) {
-      mrb_raise(mrb, E_TYPE_ERROR, "wrong argument class");
-    }
-    memcpy(mrb_range_ptr(copy), mrb_range_ptr(src), sizeof(struct RRange));
+  if (mrb_obj_equal(mrb, copy, src)) return copy;
+  //mrb_check_frozen(copy);
+  if (!mrb_obj_is_instance_of(mrb, src, mrb_obj_class(mrb, copy))) {
+    mrb_raise(mrb, E_TYPE_ERROR, "wrong argument class");
+  }
+  memcpy(mrb_range_ptr(copy), mrb_range_ptr(src), sizeof(struct RRange));
 
-    return copy;
+  return copy;
 }
 
 void

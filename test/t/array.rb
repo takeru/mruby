@@ -5,6 +5,10 @@ assert('Array', '15.2.12') do
   Array.class == Class
 end
 
+assert('Array superclass', '15.2.12.2') do
+  Array.superclass == Object
+end
+
 assert('Array.[]', '15.2.12.4.1') do
   Array.[](1,2,3) == [1, 2, 3]
 end
@@ -22,11 +26,47 @@ assert('Array#<<', '15.2.12.5.3') do
 end
 
 assert('Array#[]', '15.2.12.5.4') do
-  [1,2,3].[](1) == 2
+  e2 = nil
+  e3 = nil
+  a = Array.new
+  begin
+    # this will cause an exception due to the wrong arguments
+    a.[]()
+  rescue => e1
+    e2 = e1
+  end
+  begin
+    # this will cause an exception due to the wrong arguments
+    a.[](1,2,3)
+  rescue => e1
+    e3 = e1
+  end
+
+  [1,2,3].[](1) == 2 and
+    e2.class == ArgumentError and
+    e3.class == ArgumentError
 end
 
 assert('Array#[]=', '15.2.12.5.5') do
-  [1,2,3].[]=(1,4) == [1, 4, 3]
+  e2 = nil
+  e3 = nil
+  a = Array.new
+  begin
+    # this will cause an exception due to the wrong arguments
+    a.[]=()
+  rescue => e1
+    e2 = e1
+  end
+  begin
+    # this will cause an exception due to the wrong arguments
+    a.[]=(1,2,3,4)
+  rescue => e1
+    e3 = e1
+  end
+
+  [1,2,3].[]=(1,4) == [1, 4, 3] and
+    e2.class == ArgumentError and
+    e3.class == ArgumentError
 end
 
 assert('Array#clear', '15.2.12.5.6') do
@@ -83,7 +123,7 @@ end
 assert('Array#index', '15.2.12.5.14') do
   a = [1,2,3]
 
-  a.index(2) == 1 
+  a.index(2) == 1
 end
 
 assert('Array#initialize', '15.2.12.5.15') do
@@ -99,7 +139,7 @@ assert('Array#initialize_copy', '15.2.12.5.16') do
   a = [1,2,3]
   b = [].initialize_copy(a)
 
-  b == [1,2,3]  
+  b == [1,2,3]
 end
 
 assert('Array#join', '15.2.12.5.17') do
@@ -165,7 +205,7 @@ end
 assert('Array#rindex', '15.2.12.5.26') do
   a = [1,2,3]
 
-  a.rindex(2) == 1 
+  a.rindex(2) == 1
 end
 
 assert('Array#shift', '15.2.12.5.27') do
@@ -178,11 +218,13 @@ end
 assert('Array#size', '15.2.12.5.28') do
   a = [1,2,3]
 
-  a.size == 3  
+  a.size == 3
 end
 
 assert('Array#slice', '15.2.12.5.29') do
-  [1,2,3].[](1) == 2
+  a = "12345".slice(1, 3)
+  b = a.slice(0)
+  "#{b}:" == "2:" and [1,2,3].[](1) == 2
 end
 
 assert('Array#unshift', '15.2.12.5.30') do
@@ -193,5 +235,3 @@ assert('Array#unshift', '15.2.12.5.30') do
 end
 
 # Not ISO specified
-
-

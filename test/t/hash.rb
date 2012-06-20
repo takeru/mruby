@@ -5,6 +5,10 @@ assert('Hash', '15.2.13') do
   Hash.class == Class
 end
 
+assert('Hash superclass', '15.2.13.2') do
+  Hash.superclass == Object
+end
+
 assert('Hash#==', '15.2.13.4.1') do
   ({ 'abc' => 'abc' } ==  { 'abc' => 'abc' }) and
     not ({ 'abc' => 'abc' } ==  { 'cba' => 'cba' })
@@ -169,17 +173,17 @@ assert('Hash#member?', '15.2.13.4.21') do
 end
 
 assert('Hash#merge', '15.2.13.4.22') do
-  a = { 'abc_key' => 'abc_value', 'cba_key' => 'cba_value' } 
-  b = { 'cba_key' => 'XXX',  'xyz_key' => 'xyz_value' } 
+  a = { 'abc_key' => 'abc_value', 'cba_key' => 'cba_value' }
+  b = { 'cba_key' => 'XXX',  'xyz_key' => 'xyz_value' }
 
   result_1 = a.merge b
   result_2 = a.merge(b) do |key, original, new|
     original
   end
 
-  result_1 == {'abc_key' => 'abc_value', 'cba_key' => 'XXX',  
+  result_1 == {'abc_key' => 'abc_value', 'cba_key' => 'XXX',
                'xyz_key' => 'xyz_value' } and
-  result_2 == {'abc_key' => 'abc_value', 'cba_key' => 'cba_value',  
+  result_2 == {'abc_key' => 'abc_value', 'cba_key' => 'cba_value',
                'xyz_key' => 'xyz_value' }
 end
 
@@ -223,5 +227,43 @@ assert('Hash#values', '15.2.13.4.28') do
   a = { 'abc_key' => 'abc_value' }
 
   a.values == ['abc_value']
+end
+
+# Not ISO specified
+
+assert('Hash#reject') do
+  h = {:one => 1, :two => 2, :three => 3, :four => 4}
+  ret = h.reject do |k,v|
+    v % 2 == 0
+  end
+  ret == {:one => 1, :three => 3} and
+    h == {:one => 1, :two => 2, :three => 3, :four => 4}
+end
+
+assert('Hash#reject!') do
+  h = {:one => 1, :two => 2, :three => 3, :four => 4}
+  ret = h.reject! do |k,v|
+    v % 2 == 0
+  end
+  ret == {:one => 1, :three => 3} and
+    h == {:one => 1, :three => 3}
+end
+
+assert('Hash#select') do
+  h = {:one => 1, :two => 2, :three => 3, :four => 4}
+  ret = h.select do |k,v|
+    v % 2 == 0
+  end
+  ret == {:two => 2, :four => 4} and
+    h == {:one => 1, :two => 2, :three => 3, :four => 4}
+end
+
+assert('Hash#select!') do
+  h = {:one => 1, :two => 2, :three => 3, :four => 4}
+  ret = h.select! do |k,v|
+    v % 2 == 0
+  end
+  ret == {:two => 2, :four => 4} and
+    h == {:two => 2, :four => 4}
 end
 

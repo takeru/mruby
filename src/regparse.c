@@ -32,7 +32,7 @@
 #include <string.h>
 #include "regparse.h"
 #include <stdarg.h>
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
 
 #define WARN_BUFSIZE    256
 
@@ -298,7 +298,7 @@ strcat_capa_from_static(UChar* dest, UChar* dest_end,
   onig_strcpy(r + (dest_end - dest), src, src_end);
   return r;
 }
-#endif //INCLUDE_REGEXP
+#endif //ENABLE_REGEXP
 
 #ifdef INCLUDE_ENCODING
 #ifdef USE_ST_LIBRARY
@@ -317,8 +317,8 @@ str_end_cmp(st_data_t xp, st_data_t yp)
   const UChar *p, *q;
   int c;
 
-  x = (const st_str_end_key *)xp;
-  y = (const st_str_end_key *)yp;
+  x = (const st_str_end_key*)xp;
+  y = (const st_str_end_key*)yp;
   if ((x->end - x->s) != (y->end - y->s))
     return 1;
 
@@ -337,7 +337,7 @@ str_end_cmp(st_data_t xp, st_data_t yp)
 static st_index_t
 str_end_hash(st_data_t xp)
 {
-  const st_str_end_key *x = (const st_str_end_key *)xp;
+  const st_str_end_key *x = (const st_str_end_key*)xp;
   const UChar *p;
   st_index_t val = 0;
 
@@ -393,7 +393,7 @@ onig_st_insert_strend(hash_table_type* table, const UChar* str_key,
 #endif /* USE_ST_LIBRARY */
 #endif //INCLUDE_ENCODING
 
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
 #ifdef USE_NAMED_GROUP
 
 #define INIT_NAME_BACKREFS_ALLOC_NUM   8
@@ -2799,12 +2799,12 @@ onig_syntax_warn(ScanEnv *env, const char *fmt, ...)
     va_start(args, fmt);
     onig_vsnprintf_with_pattern(buf, WARN_BUFSIZE, env->enc,
                 env->pattern, env->pattern_end,
-                (const UChar *)fmt, args);
+                (const UChar*)fmt, args);
     va_end(args);
     if (env->sourcefile == NULL)
-      mrb_warn("%s", (char *)buf);
+      mrb_warn("%s", (char*)buf);
     else
-      mrb_compile_warn(env->sourcefile, env->sourceline, "%s", (char *)buf);
+      mrb_compile_warn(env->sourcefile, env->sourceline, "%s", (char*)buf);
 }
 
 static void
@@ -5597,4 +5597,4 @@ onig_scan_env_set_error_string(ScanEnv* env, int ecode ARG_UNUSED,
   env->error     = arg;
   env->error_end = arg_end;
 }
-#endif //INCLUDE_REGEXP
+#endif //ENABLE_REGEXP

@@ -11,21 +11,6 @@
 #include "mruby/class.h"
 #include "mruby/numeric.h"
 
-#ifdef INCLUDE_REGEXP
-  #define mrb_usascii_str_new2 mrb_usascii_str_new_cstr
-#else
-  #define mrb_usascii_str_new2 mrb_str_new_cstr
-  #define mrb_usascii_str_new  mrb_str_new
-#endif
-
-#ifndef FALSE
-#define FALSE   0
-#endif
-
-#ifndef TRUE
-#define TRUE    1
-#endif
-
 int
 mrb_obj_eq(mrb_state *mrb, mrb_value v1, mrb_value v2)
 {
@@ -106,7 +91,7 @@ mrb_true(mrb_state *mrb, mrb_value obj)
 static mrb_value
 nil_to_s(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_usascii_str_new(mrb, 0, 0);
+    return mrb_str_new(mrb, 0, 0);
 }
 
 /***********************************************************************
@@ -166,7 +151,7 @@ true_xor(mrb_state *mrb, mrb_value obj)
 static mrb_value
 true_to_s(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_usascii_str_new2(mrb, "true");
+    return mrb_str_new_cstr(mrb, "true");
 }
 
 /* 15.2.5.3.4  */
@@ -279,7 +264,7 @@ false_or(mrb_state *mrb, mrb_value obj)
 static mrb_value
 false_to_s(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_usascii_str_new2(mrb, "false");
+    return mrb_str_new_cstr(mrb, "false");
 }
 
 void
@@ -290,6 +275,7 @@ mrb_init_object(mrb_state *mrb)
   struct RClass *f;
 
   n = mrb->nil_class   = mrb_define_class(mrb, "NilClass",   mrb->object_class);
+  mrb_undef_method(mrb,  n, "new");
   mrb_define_method(mrb, n, "&",    false_and,      ARGS_REQ(1));  /* 15.2.4.3.1  */
   mrb_define_method(mrb, n, "^",    false_xor,      ARGS_REQ(1));  /* 15.2.4.3.2  */
   mrb_define_method(mrb, n, "|",    false_or,       ARGS_REQ(1));  /* 15.2.4.3.3  */
@@ -297,12 +283,14 @@ mrb_init_object(mrb_state *mrb)
   mrb_define_method(mrb, n, "to_s", nil_to_s,       ARGS_NONE());  /* 15.2.4.3.5  */
 
   t = mrb->true_class  = mrb_define_class(mrb, "TrueClass",  mrb->object_class);
+  mrb_undef_method(mrb,  n, "new");
   mrb_define_method(mrb, t, "&",    true_and,       ARGS_REQ(1));  /* 15.2.5.3.1  */
   mrb_define_method(mrb, t, "^",    true_xor,       ARGS_REQ(1));  /* 15.2.5.3.2  */
   mrb_define_method(mrb, t, "to_s", true_to_s,      ARGS_NONE());  /* 15.2.5.3.3  */
   mrb_define_method(mrb, t, "|",    true_or,        ARGS_REQ(1));  /* 15.2.5.3.4  */
 
   f = mrb->false_class = mrb_define_class(mrb, "FalseClass", mrb->object_class);
+  mrb_undef_method(mrb,  n, "new");
   mrb_define_method(mrb, f, "&",    false_and,      ARGS_REQ(1));  /* 15.2.6.3.1  */
   mrb_define_method(mrb, f, "^",    false_xor,      ARGS_REQ(1));  /* 15.2.6.3.2  */
   mrb_define_method(mrb, f, "to_s", false_to_s,     ARGS_NONE());  /* 15.2.6.3.3  */
@@ -354,8 +342,8 @@ mrb_convert_type(mrb_state *mrb, mrb_value val, mrb_int type, const char *tname,
   if (mrb_type(val) == type) return val;
   v = convert_type(mrb, val, tname, method, 1/*Qtrue*/);
   if (mrb_type(v) != type) {
-    mrb_raise(mrb, E_TYPE_ERROR, "%s#%s should return %s",
-     mrb_obj_classname(mrb, val), method, tname);
+    mrb_raise(mrb, E_TYPE_ERROR, "%s cannot be converted to %s by #%s",
+     mrb_obj_classname(mrb, val), tname, method);
   }
   return v;
 }
@@ -437,7 +425,7 @@ mrb_check_type(mrb_state *mrb, mrb_value x, enum mrb_vtype t)
         }
         else if (mrb_special_const_p(x)) {
           s = mrb_str_ptr(mrb_obj_as_string(mrb, x));
-          etype = s->buf;
+          etype = s->ptr;
         }
         else {
           etype = mrb_obj_classname(mrb, x);
@@ -475,8 +463,8 @@ mrb_any_to_s(mrb_state *mrb, mrb_value obj)
   str = mrb_str_new(mrb, 0, len); /* 6:tags 16:addr */
   s = mrb_str_ptr(str);
   //  snprintf(RSTRING(str)->ptr, len+1, "#<%s:0x%lx>", cname, obj);
-  sprintf(s->buf, "#<%s:0x%lx>", cname, (unsigned long)(obj.value.p));
-  s->len = strlen(s->buf);
+  sprintf(s->ptr, "#<%s:0x%lx>", cname, (unsigned long)(obj.value.p));
+  s->len = strlen(s->ptr);
 
   return str;
 }
@@ -623,12 +611,12 @@ mrb_Float(mrb_state *mrb, mrb_value val)
 mrb_value
 mrb_inspect(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_obj_as_string(mrb, mrb_funcall(mrb, obj, "inspect", 0, 0));
+  return mrb_obj_as_string(mrb, mrb_funcall(mrb, obj, "inspect", 0, 0));
 }
 
 int
 mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
-    return RTEST(mrb_funcall(mrb, obj1, "eql?", 1, obj2));
+  if (mrb_obj_eq(mrb, obj1, obj2)) return TRUE;
+  return RTEST(mrb_funcall(mrb, obj1, "eql?", 1, obj2));
 }
-

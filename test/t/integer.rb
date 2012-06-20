@@ -5,6 +5,10 @@ assert('Integer', '15.2.8') do
   Integer.class == Class
 end
 
+assert('Integer superclass', '15.2.8.2') do
+  Integer.superclass == Numeric
+end
+
 assert('Integer#+', '15.2.8.3.1') do
   a = 1+1
   b = 1+1.0
@@ -108,7 +112,7 @@ assert('Integer#downto', '15.2.8.3.15') do
   3.downto(1) do |i|
     a += i
   end
-  a == 6 
+  a == 6
 end
 
 assert('Integer#eql?', '15.2.8.3.16') do
@@ -168,4 +172,3 @@ assert('Integer#upto', '15.2.8.3.27') do
   end
   a == 6
 end
-

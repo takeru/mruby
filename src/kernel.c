@@ -34,21 +34,8 @@ typedef enum {
     NOEX_RESPONDS  = 0x80
 } mrb_method_flag_t;
 
-#ifdef INCLUDE_REGEXP
-#include "re.h"
-#include "regint.h"
-#endif
-
-KHASH_MAP_INIT_INT(mt, struct RProc*);
-KHASH_MAP_INIT_INT(iv, mrb_value);
-
-#ifndef FALSE
-#define FALSE   0
-#endif
-
-#ifndef TRUE
-#define TRUE    1
-#endif
+KHASH_INIT(mt, mrb_sym, struct RProc*, 1, kh_int_hash_func, kh_int_hash_equal)
+KHASH_INIT(iv, mrb_sym, mrb_value, 1, kh_int_hash_func, kh_int_hash_equal)
 
 struct obj_ivar_tag {
   mrb_value obj;
@@ -191,7 +178,7 @@ mrb_obj_not_equal_m(mrb_state *mrb, mrb_value self)
   mrb_value arg;
 
   mrb_get_args(mrb, "o", &arg);
-  if (mrb_obj_equal(mrb, self, arg)) {
+  if (mrb_equal(mrb, self, arg)) {
     return mrb_false_value();
   }
   else {
@@ -240,18 +227,6 @@ mrb_obj_id_m(mrb_state *mrb, mrb_value self)
   return mrb_fixnum_value(mrb_obj_id(self));
 }
 
-mrb_value
-send_internal(int argc, mrb_value *argv, mrb_value recv, enum call_type ctype)
-{
-    return mrb_nil_value(); /* dummy */
-}
-
-mrb_value
-mrb_f_send(int argc, mrb_value *argv, mrb_value recv)
-{
-    return send_internal(argc, argv, recv, CALL_FCALL);
-}
-
 /* 15.3.1.3.4  */
 /* 15.3.1.3.44 */
 /*
@@ -272,38 +247,14 @@ mrb_f_send(int argc, mrb_value *argv, mrb_value recv)
  *     k.send :hello, "gentle", "readers"   #=> "Hello gentle readers"
  */
 static mrb_value
-mrb_f_send_m(mrb_state *mrb, mrb_value self)
+mrb_f_send(mrb_state *mrb, mrb_value self)
 {
-  mrb_value *argv;
+  mrb_sym name;
+  mrb_value block, *argv;
   int argc;
-
-  mrb_get_args(mrb, "*", &argv, &argc);
-  return mrb_f_send(argc, argv, self);
-}
-
-/* 15.3.1.2.1  */
-/* 15.3.1.3.5  */
-/*
- *  call-seq:
- *     spawn([env,] command... [,options])     -> pid
- *     Process.spawn([env,] command... [,options])     -> pid
- *
- *  spawn executes specified command and return its pid.
- */
-static mrb_value
-mrb_f_spawn_m(mrb_state *mrb, mrb_value self)
-{
-  mrb_value *argv;
-  int argc;
-
-  mrb_get_args(mrb, "*", &argv, &argc);
-  return (mrb_f_send(argc, argv, self));
-}
-
-static mrb_value
-mrb_f_block_given_p(void)
-{
-  return mrb_false_value(); /* dummy */
+  
+  mrb_get_args(mrb, "n*&", &name, &argv, &argc, &block);
+  return mrb_funcall_with_block(mrb,self, mrb_sym2name(mrb, name), argc, argv, block);
 }
 
 /* 15.3.1.2.2  */
@@ -333,7 +284,17 @@ mrb_f_block_given_p(void)
 static mrb_value
 mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
 {
-  return mrb_f_block_given_p();
+  mrb_callinfo *ci = mrb->ci;
+  mrb_value *bp;
+
+  bp = mrb->stbase + ci->stackidx + 1;
+  ci--;
+  if (ci <= mrb->cibase) return mrb_false_value();
+  if (ci->argc > 0) {
+    bp += ci->argc;
+  }
+  if (mrb_nil_p(*bp)) return mrb_false_value();
+  return mrb_true_value();
 }
 
 /* 15.3.1.3.7  */
@@ -367,7 +328,7 @@ mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
       //struct clone_method_data data;
       /* copy singleton(unnamed) class */
       //VALUE clone = class_alloc(RBASIC(klass)->flags, 0);
-    struct RClass *clone = (struct RClass *) mrb_obj_alloc(mrb, klass->tt, mrb->class_class);
+    struct RClass *clone = (struct RClass*)mrb_obj_alloc(mrb, klass->tt, mrb->class_class);
     //clone->super = objklass->super;
 
       if ((mrb_type(obj) == MRB_TT_CLASS) ||
@@ -452,7 +413,7 @@ mrb_obj_clone(mrb_state *mrb, mrb_value self)
   if (mrb_special_const_p(self)) {
       mrb_raise(mrb, E_TYPE_ERROR, "can't clone %s", mrb_obj_classname(mrb, self));
   }
-  clone = (struct RObject *) mrb_obj_alloc(mrb, self.tt, mrb_obj_class(mrb, self));
+  clone = (struct RObject*)mrb_obj_alloc(mrb, self.tt, mrb_obj_class(mrb, self));
   clone->c = mrb_singleton_class_clone(mrb, self);
   init_copy(mrb, mrb_obj_value(clone), self);
   //1-9-2 no bug mrb_funcall(mrb, clone, "initialize_clone", 1, self);
@@ -495,40 +456,6 @@ mrb_obj_dup(mrb_state *mrb, mrb_value obj)
     mrb_funcall(mrb, dup, "initialize_copy", 1, obj);
 
     return dup;
-}
-
-/* 15.3.1.2.3  */
-/* 15.3.1.3.12 */
-/*
- *  call-seq:
- *     eval(string [, binding [, filename [,lineno]]])  -> obj
- *
- *  Evaluates the Ruby expression(s) in <em>string</em>. If
- *  <em>binding</em> is given, which must be a <code>Binding</code>
- *  object, the evaluation is performed in its context. If the
- *  optional <em>filename</em> and <em>lineno</em> parameters are
- *  present, they will be used when reporting syntax errors.
- *
- *     def getBinding(str)
- *       return binding
- *     end
- *     str = "hello"
- *     eval "str + ' Fred'"                      #=> "hello Fred"
- *     eval "str + ' Fred'", getBinding("bye")   #=> "bye Fred"
- */
-mrb_value
-mrb_f_eval(int argc, mrb_value *argv, mrb_value self)
-{
-  return mrb_false_value(); /* dummy */
-}
-mrb_value
-mrb_f_eval_m(mrb_state *mrb, mrb_value self)
-{
-  mrb_value *argv;
-  int argc;
-
-  mrb_get_args(mrb, "*", &argv, &argc);
-  return mrb_f_eval(argc, argv, self);
 }
 
 static mrb_value
@@ -622,12 +549,10 @@ mrb_obj_init_copy(mrb_state *mrb, mrb_value self)
 /* 15.3.1.3.18 */
 /*
  *  call-seq:
- *     obj.instance_eval(string [, filename [, lineno]] )   -> obj
  *     obj.instance_eval {| | block }                       -> obj
  *
- *  Evaluates a string containing Ruby source code, or the given block,
- *  within the context of the receiver (_obj_). In order to set the
- *  context, the variable +self+ is set to _obj_ while
+ *  Evaluates the given block,within  the context of the receiver (_obj_). 
+ *  In order to set the context, the variable +self+ is set to _obj_ while
  *  the code is executing, giving the code access to _obj_'s
  *  instance variables. In the version of <code>instance_eval</code>
  *  that takes a +String+, the optional second and third
@@ -645,9 +570,11 @@ mrb_obj_init_copy(mrb_state *mrb, mrb_value self)
 mrb_value
 mrb_obj_instance_eval(mrb_state *mrb, mrb_value self)
 {
-  mrb_value b;
+  mrb_value a, b;
 
-  mrb_get_args(mrb, "&", &b);
+  if (mrb_get_args(mrb, "|S&", &a, &b) == 1) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, "instance_eval with string not implemented");
+  }
   return mrb_yield_with_self(mrb, b, 0, 0, self);
 }
 
@@ -867,71 +794,6 @@ mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
   }
 }
 
-/* 15.3.1.2.6  */
-/* 15.3.1.3.27 */
-/*
- * call-seq:
- *   lambda { |...| block }  -> a_proc
- *
- * Equivalent to <code>Proc.new</code>, except the resulting Proc objects
- * check the number of parameters passed when called.
- */
-mrb_value
-proc_lambda(mrb_state *mrb, mrb_value self)
-{
-  //return mrb_block_lambda();
-  return mrb_nil_value(); /* dummy */
-}
-
-/* 15.3.1.2.7  */
-/* 15.3.1.3.28 */
-/*
- *  call-seq:
- *     local_variables    -> array
- *
- *  Returns the names of the current local variables.
- *
- *     fred = 1
- *     for i in 1..10
- *        # ...
- *     end
- *     local_variables   #=> [:fred, :i]
- */
-mrb_value
-mrb_f_local_variables(mrb_state *mrb, mrb_value self)
-{
-  mrb_value ary;
-
-  ary = mrb_ary_new(mrb);
-  return ary; /* dummy */
-}
-
-/* 15.3.1.2.8  */
-/* 15.3.1.3.29 */
-/*
- *  call-seq:
- *     loop { block }
- *     loop            -> an_enumerator
- *
- *  Repeatedly executes the block.
- *
- *  If no block is given, an enumerator is returned instead.
- *
- *     loop do
- *       print "Input: "
- *       line = gets
- *       break if !line or line =~ /^qQ/
- *       # ...
- *     end
- *
- *  StopIteration raised in the block breaks the loop.
- */
-mrb_value
-mrb_f_loop(mrb_state *mrb, mrb_value self)
-{
-  return mrb_nil_value();            /* dummy */
-}
-
 static void
 method_entry_loop(mrb_state *mrb, struct RClass* klass, mrb_value ary)
 {
@@ -958,10 +820,10 @@ class_instance_method_list(mrb_state *mrb, int argc, mrb_value *argv, struct RCl
   }
   else {
       mrb_value r;
+
       mrb_get_args(mrb, "o", &r);
       recur = mrb_test(r);
   }
-
   ary = mrb_ary_new(mrb);
   oldklass = 0;
   while (klass && (klass != oldklass)) {
@@ -1070,31 +932,6 @@ mrb_false(mrb_state *mrb, mrb_value self)
   return mrb_false_value();
 }
 
-/* 15.3.1.2.10  */
-/* 15.3.1.3.35 */
-/*
- *  call-seq:
- *     print(obj, ...)    -> nil
- *
- *  Prints each object in turn to <code>$stdout</code>. If the output
- *  field separator (<code>$,</code>) is not +nil+, its
- *  contents will appear between each field. If the output record
- *  separator (<code>$\\</code>) is not +nil+, it will be
- *  appended to the output. If no arguments are given, prints
- *  <code>$_</code>. Objects that aren't strings will be converted by
- *  calling their <code>to_s</code> method.
- *
- *     print "cat", [1,2,3], 99, "\n"
- *     $, = ", "
- *     $\ = "\n"
- *     print "cat", [1,2,3], 99
- *
- *  <em>produces:</em>
- *
- *     cat12399
- *     cat, 1, 2, 3, 99
- */
-
 /* 15.3.1.3.36 */
 /*
  *  call-seq:
@@ -1152,37 +989,15 @@ mrb_obj_public_methods(mrb_state *mrb, mrb_value self)
   return mrb_obj_methods(mrb, argc, argv, self, NOEX_PUBLIC); /* public attribute not define */
 }
 
-/* 15.3.1.2.11  */
-/* 15.3.1.3.39 */
-/*
- *  call-seq:
- *     puts(obj, ...)    -> nil
- *
- *  Equivalent to
- *
- *      $stdout.puts(obj, ...)
- */
-
-static mrb_value
-get_errinfo(mrb_state *mrb)
-{
-    //return get_thread_errinfo(GET_THREAD());
-    return mrb_str_new_cstr(mrb, "error!!"); /* dummy */
-}
-
 /* 15.3.1.2.12  */
 /* 15.3.1.3.40 */
 /*
  *  call-seq:
  *     raise
  *     raise(string)
- *     raise(exception [, string [, array]])
- *     fail
- *     fail(string)
- *     fail(exception [, string [, array]])
+ *     raise(exception [, string])
  *
- *  With no arguments, raises the exception in <code>$!</code> or raises
- *  a <code>RuntimeError</code> if <code>$!</code> is +nil+.
+ *  With no arguments, raises a <code>RuntimeError</code>
  *  With a single +String+ argument, raises a
  *  +RuntimeError+ with the string as a message. Otherwise,
  *  the first parameter should be the name of an +Exception+
@@ -1198,19 +1013,24 @@ get_errinfo(mrb_state *mrb)
 mrb_value
 mrb_f_raise(mrb_state *mrb, mrb_value self)
 {
-  mrb_value err;
-  mrb_value *argv;
+  mrb_value a[2];
   int argc;
 
-  mrb_get_args(mrb, "*", &argv, &argc);
-  if (argc == 0) {
-    err = get_errinfo(mrb);
-    if (!mrb_nil_p(err)) {
-        argc = 1;
-        argv[0] = err;
-      }
+  argc = mrb_get_args(mrb, "|oo", &a[0], &a[1]);
+  switch (argc) {
+  case 0:
+    mrb_raise(mrb, E_RUNTIME_ERROR, "");
+    break;
+  case 1:
+    a[1] = mrb_check_string_type(mrb, a[0]);
+    if (!mrb_nil_p(a[1])) {
+      argc = 2;
+      a[0] = mrb_obj_value(E_RUNTIME_ERROR);
+    }
+    /* fall through */
+  default:
+    mrb_exc_raise(mrb, mrb_make_exception(mrb, argc, a));
   }
-  mrb_exc_raise(mrb, mrb_make_exception(mrb, argc, argv));
   return mrb_nil_value();            /* not reached */
 }
 
@@ -1275,44 +1095,10 @@ mrb_obj_remove_instance_variable(mrb_state *mrb, mrb_value self)
   return mrb_nil_value();            /* not reached */
 }
 
-/* 15.3.1.2.13  */
-/* 15.3.1.3.42 */
-/*
- *  call-seq:
- *     require(string)    -> true or false
- *
- *  Ruby tries to load the library named _string_, returning
- *  +true+ if successful. If the filename does not resolve to
- *  an absolute path, it will be searched for in the directories listed
- *  in <code>$:</code>. If the file has the extension ``.rb'', it is
- *  loaded as a source file; if the extension is ``.so'', ``.o'', or
- *  ``.dll'', or whatever the default shared library extension is on
- *  the current platform, Ruby loads the shared library as a Ruby
- *  extension. Otherwise, Ruby tries adding ``.rb'', ``.so'', and so on
- *  to the name. The name of the loaded feature is added to the array in
- *  <code>$"</code>. A feature will not be loaded if its name already
- *  appears in <code>$"</code>. The file name is converted to an absolute
- *  path, so ``<code>require 'a'; require './a'</code>'' will not load
- *  <code>a.rb</code> twice.
- *
- *     require "my-library.rb"
- *     require "db-driver"
- */
-mrb_value
-mrb_f_require(mrb_state *mrb, mrb_value self)
-{
-  mrb_value fname;
-
-  mrb_get_args(mrb, "o", &fname);
-  return mrb_nil_value(); /* dummy */
-}
-
-
 static inline int
 basic_obj_respond_to(mrb_state *mrb, mrb_value obj, mrb_sym id, int pub)
 {
   return mrb_respond_to(mrb, obj, id);
-  //return TRUE;
 }
 /* 15.3.1.3.43 */
 /*
@@ -1400,17 +1186,11 @@ mrb_init_kernel(mrb_state *mrb)
   struct RClass *krn;
 
   krn = mrb->kernel_module = mrb_define_module(mrb, "Kernel");
-  mrb_define_class_method(mrb, krn, "'",                    mrb_f_spawn_m,                   ARGS_ANY());     /* 15.3.1.2.1  */
   mrb_define_class_method(mrb, krn, "block_given?",         mrb_f_block_given_p_m,           ARGS_NONE());    /* 15.3.1.2.2  */
-  mrb_define_class_method(mrb, krn, "eval",                 mrb_f_eval_m,                    ARGS_ANY());     /* 15.3.1.2.3  */
   mrb_define_class_method(mrb, krn, "global_variables",     mrb_f_global_variables,          ARGS_NONE());    /* 15.3.1.2.4  */
   mrb_define_class_method(mrb, krn, "iterator?",            mrb_f_block_given_p_m,           ARGS_NONE());    /* 15.3.1.2.5  */
-  mrb_define_class_method(mrb, krn, "lambda",               proc_lambda,                     ARGS_NONE());    /* 15.3.1.2.6  */
-  mrb_define_class_method(mrb, krn, "local_variables",      mrb_f_local_variables,           ARGS_NONE());    /* 15.3.1.2.7  */
-  mrb_define_class_method(mrb, krn, "loop",                 mrb_f_loop,                      ARGS_NONE());    /* 15.3.1.2.8  */
 ;     /* 15.3.1.2.11 */
   mrb_define_class_method(mrb, krn, "raise",                mrb_f_raise,                     ARGS_ANY());     /* 15.3.1.2.12 */
-  mrb_define_class_method(mrb, krn, "require",              mrb_f_require,                   ARGS_REQ(1));    /* 15.3.1.2.13 */
 
   mrb_define_method(mrb, krn, "singleton_class",            mrb_singleton_class,             ARGS_NONE());
 
@@ -1418,15 +1198,13 @@ mrb_init_kernel(mrb_state *mrb)
   mrb_define_method(mrb, krn, "!=",                         mrb_obj_not_equal_m,             ARGS_REQ(1));
   mrb_define_method(mrb, krn, "===",                        mrb_equal_m,                     ARGS_REQ(1));    /* 15.3.1.3.2  */
   mrb_define_method(mrb, krn, "__id__",                     mrb_obj_id_m,                    ARGS_NONE());    /* 15.3.1.3.3  */
-  mrb_define_method(mrb, krn, "__send__",                   mrb_f_send_m,                    ARGS_ANY());     /* 15.3.1.3.4  */
-  mrb_define_method(mrb, krn, "'",                          mrb_f_spawn_m,                   ARGS_ANY());     /* 15.3.1.3.5  *//* "spawn"->"'" */
+  mrb_define_method(mrb, krn, "__send__",                   mrb_f_send,                      ARGS_ANY());     /* 15.3.1.3.4  */
   mrb_define_method(mrb, krn, "block_given?",               mrb_f_block_given_p_m,           ARGS_NONE());    /* 15.3.1.3.6  */
   mrb_define_method(mrb, krn, "class",                      mrb_obj_class_m,                 ARGS_NONE());    /* 15.3.1.3.7  */
   mrb_define_method(mrb, krn, "clone",                      mrb_obj_clone,                   ARGS_NONE());    /* 15.3.1.3.8  */
   mrb_define_method(mrb, krn, "dup",                        mrb_obj_dup,                     ARGS_NONE());    /* 15.3.1.3.9  */
   mrb_define_method(mrb, krn, "eql?",                       mrb_obj_equal_m,                 ARGS_REQ(1));    /* 15.3.1.3.10 */
   mrb_define_method(mrb, krn, "equal?",                     mrb_obj_equal_m,                 ARGS_REQ(1));    /* 15.3.1.3.11 */
-  mrb_define_method(mrb, krn, "eval",                       mrb_f_eval_m,                    ARGS_ANY());     /* 15.3.1.3.12 */
   mrb_define_method(mrb, krn, "extend",                     mrb_obj_extend_m,                ARGS_ANY());     /* 15.3.1.3.13 */
   mrb_define_method(mrb, krn, "global_variables",           mrb_f_global_variables,          ARGS_NONE());    /* 15.3.1.3.14 */
   mrb_define_method(mrb, krn, "hash",                       mrb_obj_hash,                    ARGS_NONE());    /* 15.3.1.3.15 */
@@ -1441,9 +1219,6 @@ mrb_init_kernel(mrb_state *mrb)
   mrb_define_method(mrb, krn, "is_a?",                      mrb_obj_is_kind_of_m,            ARGS_REQ(1));    /* 15.3.1.3.24 */
   mrb_define_method(mrb, krn, "iterator?",                  mrb_f_block_given_p_m,           ARGS_NONE());    /* 15.3.1.3.25 */
   mrb_define_method(mrb, krn, "kind_of?",                   mrb_obj_is_kind_of_m,            ARGS_REQ(1));    /* 15.3.1.3.26 */
-  mrb_define_method(mrb, krn, "lambda",                     proc_lambda,                     ARGS_NONE());    /* 15.3.1.3.27 */
-  mrb_define_method(mrb, krn, "local_variables",            mrb_f_local_variables,           ARGS_NONE());    /* 15.3.1.3.28 */
-  mrb_define_method(mrb, krn, "loop",                       mrb_f_loop,                      ARGS_NONE());    /* 15.3.1.3.29 */
   mrb_define_method(mrb, krn, "methods",                    mrb_obj_methods_m,               ARGS_ANY());     /* 15.3.1.3.31 */
   mrb_define_method(mrb, krn, "nil?",                       mrb_false,                       ARGS_NONE());    /* 15.3.1.3.32 */
   mrb_define_method(mrb, krn, "object_id",                  mrb_obj_id_m,                    ARGS_NONE());    /* 15.3.1.3.33 */
@@ -1452,14 +1227,16 @@ mrb_init_kernel(mrb_state *mrb)
   mrb_define_method(mrb, krn, "public_methods",             mrb_obj_public_methods,          ARGS_ANY());     /* 15.3.1.3.38 */
   mrb_define_method(mrb, krn, "raise",                      mrb_f_raise,                     ARGS_ANY());     /* 15.3.1.3.40 */
   mrb_define_method(mrb, krn, "remove_instance_variable",   mrb_obj_remove_instance_variable,ARGS_REQ(1));    /* 15.3.1.3.41 */
-  mrb_define_method(mrb, krn, "require",                    mrb_f_require,                   ARGS_REQ(1));    /* 15.3.1.3.42 */
   mrb_define_method(mrb, krn, "respond_to?",                obj_respond_to,                  ARGS_ANY());     /* 15.3.1.3.43 */
-  mrb_define_method(mrb, krn, "send",                       mrb_f_send_m,                    ARGS_ANY());     /* 15.3.1.3.44 */
+  mrb_define_method(mrb, krn, "send",                       mrb_f_send,                      ARGS_ANY());     /* 15.3.1.3.44 */
+  mrb_define_method(mrb, krn, "__send__",                   mrb_f_send,                      ARGS_ANY());     /* 15.3.1.3.4 */
   mrb_define_method(mrb, krn, "singleton_methods",          mrb_obj_singleton_methods_m,     ARGS_ANY());     /* 15.3.1.3.45 */
   mrb_define_method(mrb, krn, "to_s",                       mrb_any_to_s,                    ARGS_NONE());    /* 15.3.1.3.46 */
 
+#ifdef ENABLE_KERNEL_SPRINTF
   mrb_define_method(mrb, krn, "sprintf",                    mrb_f_sprintf,                   ARGS_ANY());     /* in sprintf.c */
   mrb_define_method(mrb, krn, "format",                     mrb_f_sprintf,                   ARGS_ANY());     /* in sprintf.c */
+#endif
 
   mrb_include_module(mrb, mrb->object_class, mrb->kernel_module);
 }

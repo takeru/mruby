@@ -18,6 +18,7 @@
 #include "mruby/proc.h"
 #include "mruby/data.h"
 #include "mruby/numeric.h"
+#include "mruby/variable.h"
 
 /*
   = Tri-color Incremental Garbage Collection
@@ -70,11 +71,33 @@
 
 */
 
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
 #include "re.h"
 #endif
 
-#include "gc.h"
+struct free_obj {
+  MRUBY_OBJECT_HEADER;
+  struct RBasic *next;
+};
+
+typedef struct {
+  union {
+    struct free_obj free;
+    struct RBasic basic;
+    struct RObject object;
+    struct RClass klass;
+    struct RString string;
+    struct RArray array;
+    struct RHash hash;
+    struct RRange range;
+    struct RStruct structdata;
+    struct RProc procdata;
+#ifdef ENABLE_REGEXP
+    struct RMatch match;
+    struct RRegexp regexp;
+#endif
+  } as;
+} RVALUE;
 
 #ifdef GC_PROFILE
 #include <sys/time.h>
@@ -121,25 +144,31 @@ gettimeofday_time(void)
 
 #define GC_STEP_SIZE 1024
 
-
 void*
 mrb_realloc(mrb_state *mrb, void *p, size_t len)
 {
-  return (mrb->allocf)(mrb, p, len);
+  p = (mrb->allocf)(mrb, p, len);
+
+  if (!p && len > 0 && mrb->heaps) {
+    mrb_garbage_collect(mrb);
+    p = (mrb->allocf)(mrb, p, len);
+  }
+  return p;
 }
 
 void*
 mrb_malloc(mrb_state *mrb, size_t len)
 {
-  return (mrb->allocf)(mrb, 0, len);
+  return mrb_realloc(mrb, 0, len);
 }
 
 void*
 mrb_calloc(mrb_state *mrb, size_t nelem, size_t len)
 {
-  void *p = (mrb->allocf)(mrb, 0, nelem*len);
+  void *p = mrb_realloc(mrb, 0, nelem*len);
 
-  memset(p, 0, nelem*len);
+  if (len > 0)
+    memset(p, 0, nelem*len);
   return p;
 }
 
@@ -242,11 +271,32 @@ mrb_init_heap(mrb_state *mrb)
 #endif
 }
 
+static void
+gc_protect(mrb_state *mrb, struct RBasic *p)
+{
+  if (mrb->arena_idx > MRB_ARENA_SIZE) {
+    /* arena overflow error */
+    mrb->arena_idx = MRB_ARENA_SIZE - 4; /* force room in arena */
+    mrb_raise(mrb, E_RUNTIME_ERROR, "arena overflow error");
+  }
+  mrb->arena[mrb->arena_idx++] = p;
+}
+
+void
+mrb_gc_protect(mrb_state *mrb, mrb_value obj)
+{
+  if (SPECIAL_CONST_P(obj)) return;
+  gc_protect(mrb, RBASIC(obj));
+}
+
 struct RBasic*
 mrb_obj_alloc(mrb_state *mrb, enum mrb_vtype ttype, struct RClass *cls)
 {
   struct RBasic *p;
 
+#ifdef MRB_GC_STRESS
+  mrb_garbage_collect(mrb);
+#endif
   if (mrb->gc_threshold < mrb->live) {
     mrb_incremental_gc(mrb);
   }
@@ -261,12 +311,8 @@ mrb_obj_alloc(mrb_state *mrb, enum mrb_vtype ttype, struct RClass *cls)
   }
 
   mrb->live++;
-  mrb->arena[mrb->arena_idx++] = p;
+  gc_protect(mrb, p);
   memset(p, 0, sizeof(RVALUE));
-  if (mrb->arena_idx >= MRB_ARENA_SIZE) {
-    /* arena overflow error */
-    mrb_raise(mrb, E_TYPE_ERROR, "arena overflow error");
-  }
   p->tt = ttype;
   p->c = cls;
   paint_partial_white(mrb, p);
@@ -276,6 +322,11 @@ mrb_obj_alloc(mrb_state *mrb, enum mrb_vtype ttype, struct RClass *cls)
 static inline void
 add_gray_list(mrb_state *mrb, struct RBasic *obj)
 {
+#ifdef MRB_GC_STRESS
+  if (obj->tt > MRB_TT_MAXDEFINE) {
+    abort();
+  }
+#endif
   paint_gray(obj);
   obj->gcnext = mrb->gray_list;
   mrb->gray_list = obj;
@@ -299,13 +350,13 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
     {
       struct RClass *c = (struct RClass*)obj;
 
-      mrb_gc_mark_iv(mrb, (struct RObject*)obj);
       mrb_gc_mark_mt(mrb, c);
       mrb_gc_mark(mrb, (struct RBasic*)c->super);
     }
-    break;
+    /* fall through */
 
   case MRB_TT_OBJECT:
+  case MRB_TT_DATA:
     mrb_gc_mark_iv(mrb, (struct RObject*)obj);
     break;
 
@@ -320,7 +371,7 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
 
   case MRB_TT_ENV:
     {
-      struct REnv *e = (struct REnv *)obj;
+      struct REnv *e = (struct REnv*)obj;
 
       if (e->cioff < 0) {
         int i, len;
@@ -339,7 +390,7 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
       size_t i, e;
 
       for (i=0,e=a->len; i<e; i++) {
-        mrb_gc_mark_value(mrb, a->buf[i]);
+        mrb_gc_mark_value(mrb, a->ptr[i]);
       }
     }
     break;
@@ -350,14 +401,6 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
     break;
 
   case MRB_TT_STRING:
-    {
-      struct RString *s = (struct RString*)obj;
-
-      while (s->flags & MRB_STR_SHARED) {
-        s = s->aux.shared;
-        if (!s) break;
-      }
-    }
     break;
 
   case MRB_TT_RANGE:
@@ -369,7 +412,7 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
     }
     break;
 
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
   case MRB_TT_MATCH:
     {
       struct RMatch *m = (struct RMatch*)obj;
@@ -427,7 +470,7 @@ obj_free(mrb_state *mrb, struct RBasic *obj)
 
   case MRB_TT_ENV:
     {
-      struct REnv *e = (struct REnv *)obj;
+      struct REnv *e = (struct REnv*)obj;
 
       if (e->cioff < 0) {
         mrb_free(mrb, e->stack);
@@ -437,7 +480,10 @@ obj_free(mrb_state *mrb, struct RBasic *obj)
     break;
 
   case MRB_TT_ARRAY:
-    mrb_free(mrb, ((struct RArray*)obj)->buf);
+    if (obj->flags & MRB_ARY_SHARED)
+      mrb_ary_decref(mrb, ((struct RArray*)obj)->aux.shared);
+    else
+      mrb_free(mrb, ((struct RArray*)obj)->ptr);
     break;
 
   case MRB_TT_HASH:
@@ -446,8 +492,10 @@ obj_free(mrb_state *mrb, struct RBasic *obj)
     break;
 
   case MRB_TT_STRING:
-    if (!(obj->flags & MRB_STR_SHARED))
-      mrb_free(mrb, ((struct RString*)obj)->buf);
+    if (obj->flags & MRB_STR_SHARED)
+      mrb_str_decref(mrb, ((struct RString*)obj)->aux.shared);
+    else
+      mrb_free(mrb, ((struct RString*)obj)->ptr);
     break;
 
   case MRB_TT_RANGE:
@@ -456,7 +504,7 @@ obj_free(mrb_state *mrb, struct RBasic *obj)
 
   case MRB_TT_DATA:
     {
-      struct RData *d = (struct RData *)obj;
+      struct RData *d = (struct RData*)obj;
       if (d->type->dfree) {
         d->type->dfree(mrb, d->data);
       }
@@ -498,14 +546,18 @@ root_scan_phase(mrb_state *mrb)
   /* mark closure */
   for (ci = mrb->cibase; ci <= mrb->ci; ci++) {
     if (!ci) continue;
-    mrb_gc_mark( mrb, (struct RBasic*)ci->env);
+    mrb_gc_mark(mrb, (struct RBasic*)ci->env);
+    mrb_gc_mark(mrb, (struct RBasic*)ci->proc);
+    mrb_gc_mark(mrb, (struct RBasic*)ci->target_class);
   }
   /* mark irep pool */
   for (i=0; i<mrb->irep_len; i++) {
-    mrb_irep *irep = mrb->irep[i];
-    if (!irep) continue;
-    for (j=0; j<irep->plen; j++) {
-      mrb_gc_mark_value(mrb, irep->pool[j]);
+    if (mrb->irep) {
+      mrb_irep *irep = mrb->irep[i];
+      if (!irep) continue;
+      for (j=0; j<irep->plen; j++) {
+	mrb_gc_mark_value(mrb, irep->pool[j]);
+      }
     }
   }
 }
@@ -559,7 +611,7 @@ gc_gray_mark(mrb_state *mrb, struct RBasic *obj)
     children+=2;
     break;
 
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
   case MRB_TT_MATCH:
     children+=2;
     break;
@@ -844,9 +896,10 @@ gc_interval_ratio_get(mrb_state *mrb, mrb_value obj)
 static mrb_value
 gc_interval_ratio_set(mrb_state *mrb, mrb_value obj)
 {
-  mrb_value ratio;
-  mrb_get_args(mrb, "o", &ratio);
-  mrb->gc_interval_ratio = mrb_fixnum(mrb_to_int(mrb, ratio));
+  mrb_int ratio;
+
+  mrb_get_args(mrb, "i", &ratio);
+  mrb->gc_interval_ratio = ratio;
   return mrb_nil_value();
 }
 
@@ -876,9 +929,10 @@ gc_step_ratio_get(mrb_state *mrb, mrb_value obj)
 static mrb_value
 gc_step_ratio_set(mrb_state *mrb, mrb_value obj)
 {
-  mrb_value ratio;
-  mrb_get_args(mrb, "o", &ratio);
-  mrb->gc_step_ratio = mrb_fixnum(mrb_to_int(mrb, ratio));
+  mrb_int ratio;
+
+  mrb_get_args(mrb, "i", &ratio);
+  mrb->gc_step_ratio = ratio;
   return mrb_nil_value();
 }
 
@@ -1020,7 +1074,7 @@ test_gc_gray_mark(void)
   puts("test_gc_gray_mark");
 
   puts("  in MRB_TT_CLASS");
-  obj = (struct RBasic *)mrb->object_class;
+  obj = (struct RBasic*)mrb->object_class;
   paint_gray(obj);
   gray_num = gc_gray_mark(mrb, obj);
   gc_assert(is_black(obj));
@@ -1087,10 +1141,10 @@ test_incremental_gc(void)
   incremental_gc(mrb, max);
   gc_assert(mrb->gc_state == GC_STATE_NONE);
 
-  free = (RVALUE *)mrb->heaps->freelist;
+  free = (RVALUE*)mrb->heaps->freelist;
   while (free) {
    freed++;
-   free = (RVALUE *)free->as.free.next;
+   free = (RVALUE*)free->as.free.next;
   }
 
   gc_assert(mrb->live == live);

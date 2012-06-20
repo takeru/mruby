@@ -142,6 +142,11 @@ main(void)
 
   /* new interpreter instance */ 
   mrb_interpreter = mrb_open();
+  if (mrb_interpreter == NULL) {
+    fprintf(stderr, "Invalid mrb_interpreter, exiting mirb");
+    return EXIT_FAILURE;
+  }
+
   /* new parser instance */
   parser = mrb_parser_new(mrb_interpreter);
   memset(ruby_code, 0, sizeof(*ruby_code));
@@ -162,7 +167,8 @@ main(void)
 
     last_code_line[char_index] = '\0';
 
-    if (strcmp(last_code_line, "quit") == 0) {
+    if ((strcmp(last_code_line, "quit") == 0) ||
+        (strcmp(last_code_line, "exit") == 0)) {
       if (code_block_open) {
         /* cancel the current block and reset */
         code_block_open = FALSE;
@@ -227,6 +233,7 @@ main(void)
       }
     }
   }
+  mrb_close(mrb_interpreter);
 
   return 0;
 }

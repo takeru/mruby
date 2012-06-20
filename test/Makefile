@@ -16,17 +16,23 @@ ASSLIB := $(BASEDIR)/assert.rb
 MRBS := $(BASEDIR)/t/*.rb
 OBJS := driver.o $(MLIB)
 
-# C compiler (gcc)
-CC = gcc
-LL = gcc
-AR = ar
-DEBUG_MODE = 1
-ifeq ($(DEBUG_MODE),1)
-CFLAGS = -g
-else
-CFLAGS = -O3
+# libraries, includes
+LIBS = -lm
+INCLUDES = -I$(BASEDIR)/../src -I$(BASEDIR)/../include
+
+ifeq ($(strip $(COMPILE_MODE)),)
+  # default compile option
+  COMPILE_MODE = debug
 endif
-INCLUDES = -I../src -I../include
+
+ifeq ($(COMPILE_MODE),debug)
+  CFLAGS = -g -O3
+else ifeq ($(COMPILE_MODE),release)
+  CFLAGS = -O3
+else ifeq ($(COMPILE_MODE),small)
+  CFLAGS = -Os
+endif
+
 ALL_CFLAGS = -Wall -Werror-implicit-function-declaration $(CFLAGS)
 ifeq ($(OS),Windows_NT)
   MAKE_FLAGS = CC=$(CC) LL=$(LL) ALL_CFLAGS="$(ALL_CFLAGS)"
@@ -43,20 +49,6 @@ MRBC = ../bin/mrbc
 EXE := $(TARGET)
 endif
 
-# libraries, includes
-LIBS = -lm
-
-# compiler, linker (gcc)
-CC = gcc
-LL = gcc
-YACC = bison
-DEBUG_MODE = 1
-ifeq ($(DEBUG_MODE),1)
-CFLAGS = -g -O3
-else
-CFLAGS = -O3
-endif
-ALL_CFLAGS = -Wall -Werror-implicit-function-declaration $(CFLAGS)
 
 ##############################
 # generic build targets, rules
@@ -66,7 +58,7 @@ all : $(EXE)
 	./$(EXE)
 
 # executable constructed using linker from object files
-$(EXE) : $(OBJS)
+$(EXE) : $(OBJS) $(LIBR)
 	$(LL) -o $@ $(CFLAGS) $(OBJS) $(LIBR) $(LIBS)
 
 -include $(OBJS:.o=.d)
@@ -77,14 +69,14 @@ $(OBJS) : %.o : %.c
 
 # Compile C source from merged mruby source
 $(CLIB) : $(RLIB) $(MRBC) $(INIT)
-	$(MRBC) -Bmrbtest_irep -o$(DLIB) $(RLIB); cat $(INIT) $(DLIB) > $@
+	$(MRBC) -Bmrbtest_irep -o$(DLIB) $(RLIB); $(CAT) $(INIT) $(DLIB) > $@
 
 # merge mruby sources
 $(RLIB) : $(ASSLIB) $(MRBS)
-	cat $(ASSLIB) $(MRBS) > $@
+	$(CAT) $(ASSLIB) $(MRBS) > $@
 
 # clean up
 .PHONY : clean
 clean :
 	@echo "make: removing targets, objects and depend files of `pwd`"
-	-rm -f $(MLIB) $(CLIB) $(RLIB) $(DLIB) $(DEPLIB) $(OBJS) $(EXE)
+	-$(RM_F) $(MLIB) $(CLIB) $(RLIB) $(DLIB) $(DEPLIB) $(OBJS) $(EXE)

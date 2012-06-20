@@ -5,6 +5,10 @@ assert('Range', '15.2.14') do
   Range.class == Class
 end
 
+assert('Range superclass', '15.2.14.2') do
+  Range.superclass == Object
+end
+
 assert('Range#==', '15.2.14.4.1') do
   (1..10) == (1..10) and not (1..10) == (1..100)
 end
@@ -62,4 +66,3 @@ assert('Range#member?', '15.2.14.4.11') do
 
   a.member?(5) and not a.member?(20)
 end
-

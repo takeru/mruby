@@ -28,7 +28,7 @@
  */
 
 #include "mruby.h"
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
 #include <string.h>
 #include "regint.h"
 
@@ -1298,9 +1298,9 @@ match_at(regex_t* reg, const UChar* str, const UChar* end,
           (int )(end - str), (int )(sstart - str));
 #endif
 
-  STACK_PUSH_ENSURED(STK_ALT, (UChar *)FinishCode);  /* bottom stack */
+  STACK_PUSH_ENSURED(STK_ALT, (UChar*)FinishCode);  /* bottom stack */
   best_len = ONIG_MISMATCH;
-  s = (UChar* )sstart;
+  s = (UChar*)sstart;
   while (1) {
 #ifdef ONIG_DEBUG_MATCH
     if (s) {
@@ -3754,4 +3754,4 @@ onig_copy_encoding(OnigEncoding to, OnigEncoding from)
 {
   *to = *from;
 }
-#endif //INCLUDE_REGEXP
+#endif //ENABLE_REGEXP

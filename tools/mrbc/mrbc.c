@@ -158,17 +158,24 @@ main(int argc, char **argv)
   struct _args args;
   struct mrb_parser_state *p;
 
+  if (mrb == NULL) {
+    fprintf(stderr, "Invalid mrb_state, exiting mrbc");
+    return EXIT_FAILURE;
+  }
+
   n = parse_args(mrb, argc, argv, &args);
 
   if (n < 0 || args.rfp == NULL) {
     cleanup(&args);
     usage(argv[0]);
+    mrb_close(mrb);
     return n;
   }
 
   p = mrb_parse_file(mrb, args.rfp);
   if (!p || !p->tree || p->nerr) {
     cleanup(&args);
+    mrb_close(mrb);
     return -1;
   }
 
@@ -183,6 +190,7 @@ main(int argc, char **argv)
 
   if (n < 0 || args.check_syntax) {
     cleanup(&args);
+    mrb_close(mrb);
     return n;
   }
   if (args.initname) {
@@ -196,13 +204,9 @@ main(int argc, char **argv)
   }
 
   cleanup(&args);
+  mrb_close(mrb);
 
   return n;
-}
-
-void
-mrb_init_ext(mrb_state *mrb)
-{
 }
 
 void

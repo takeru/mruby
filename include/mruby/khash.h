@@ -129,6 +129,9 @@ static const uint8_t __m[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
 	  kh_value(h,k) = old_vals[i];                                  \
 	}                                                               \
       }                                                                 \
+      mrb_free(h->mrb, old_e_flags);                                    \
+      mrb_free(h->mrb, old_keys);                                       \
+      mrb_free(h->mrb, old_vals);                                       \
     }                                                                   \
   }                                                                     \
   static inline khint_t kh_put_##name(kh_##name##_t *h, khkey_t key)    \
@@ -160,15 +163,7 @@ static const uint8_t __m[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
   {                                                                     \
     h->d_flags[x/8] |= __m[x%8];                                        \
     h->size--;                                                          \
-  }                                                                     \
-  static inline void kh_debug_##name(kh_##name##_t *h)                  \
-  {                                                                     \
-    khint_t i;                                                          \
-    printf("idx:e_flag:d_flag\n");                                      \
-    for( i=0 ; i<h->n_buckets/8 ; i++ ){                                \
-      printf("%4d:%02X:%02X\n", i, h->e_flags[i], h->d_flags[i]);       \
-    }                                                                   \
-  }                                                                     \
+  }
 
 #define khash_t(name) kh_##name##_t
 
@@ -179,7 +174,6 @@ static const uint8_t __m[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
 #define kh_put(name, h, k) kh_put_##name(h, k)
 #define kh_get(name, h, k) kh_get_##name(h, k)
 #define kh_del(name, h, k) kh_del_##name(h, k)
-#define kh_debug(name, h) kh_debug_##name(h)
 
 #define kh_exist(h, x) (!__ac_iseither((h)->e_flags, (h)->d_flags, (x)))
 #define kh_key(h, x) ((h)->keys[x])
@@ -190,10 +184,9 @@ static const uint8_t __m[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
 #define kh_size(h) ((h)->size)
 #define kh_n_buckets(h) ((h)->n_buckets)
 
-//#define kh_int_hash_func(mrb,key) (uint32_t)(key)
-#define kh_int_hash_func(mrb,key) (uint32_t)((key)^((key)<<2)^((key)>>2))
+#define kh_int_hash_func(mrb,key) (khint_t)((key)^((key)<<2)^((key)>>2))
 #define kh_int_hash_equal(mrb,a, b) (a == b)
-#define kh_int64_hash_func(mrb,key) (uint32_t)((key)>>33^(key)^(key)<<11)
+#define kh_int64_hash_func(mrb,key) (khint_t)((key)>>33^(key)^(key)<<11)
 #define kh_int64_hash_equal(mrb,a, b) (a == b)
 static inline khint_t __ac_X31_hash_string(const char *s)
 {

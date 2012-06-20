@@ -30,6 +30,7 @@ module Kernel
       i += 1
     end
     __printstr__ "\n" if len == 0
+    nil
   end
 
   ##
@@ -45,5 +46,9 @@ module Kernel
       i += 1
     end
     args[0]
+  end
+
+  def printf(*args)
+    __printstr__(sprintf(*args))
   end
 end

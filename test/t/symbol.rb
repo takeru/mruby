@@ -5,6 +5,10 @@ assert('Symbol', '15.2.11') do
   Symbol.class == Class
 end
 
+assert('Symbol superclass', '15.2.11.2') do
+  Symbol.superclass == Object
+end
+
 assert('Symbol#===', '15.2.11.3.1') do
   :abc === :abc and not :abc === :cba
 end
@@ -20,4 +24,3 @@ end
 assert('Symbol#to_sym', '15.2.11.3.4') do
   :abc.to_sym == :abc
 end
-

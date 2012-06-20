@@ -8,18 +8,10 @@
 #include "mruby/dump.h"
 
 #include "mruby/string.h"
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
 #include "re.h"
 #endif
 #include "mruby/irep.h"
-
-#ifndef FALSE
-#define FALSE   0
-#endif
-
-#ifndef TRUE
-#define TRUE    1
-#endif
 
 typedef struct _RiteFILE
 {
@@ -319,7 +311,7 @@ read_rite_header(mrb_state *mrb, unsigned char *bin, rite_binary_header*  bin_he
     return MRB_DUMP_INVALID_FILE_HEADER;    //Instruction set version check
   }
 
-  crc = calc_crc_16_ccitt((unsigned char *)bin_header, sizeof(*bin_header));   //Calculate CRC
+  crc = calc_crc_16_ccitt((unsigned char*)bin_header, sizeof(*bin_header));   //Calculate CRC
   if (crc != bin_to_uint16(bin)) {
     return MRB_DUMP_INVALID_FILE_HEADER;    //CRC error
   }
@@ -336,7 +328,7 @@ read_rite_irep_record(mrb_state *mrb, unsigned char *src, mrb_irep *irep, uint32
   uint16_t crc, tt, pdl, snl, offset, bufsize=MRB_DUMP_DEFAULT_STR_LEN;
   mrb_int fix_num;
   mrb_float f;
-  mrb_value str;
+  int ai = mrb_gc_arena_save(mrb);
 
   recordStart = src;
   buf = mrb_malloc(mrb, bufsize);
@@ -376,7 +368,7 @@ read_rite_irep_record(mrb_state *mrb, unsigned char *src, mrb_irep *irep, uint32
       src += MRB_DUMP_SIZE_OF_LONG;
     }
   }
-  crc = calc_crc_16_ccitt((unsigned char *)pStart, src - pStart);     //Calculate CRC
+  crc = calc_crc_16_ccitt((unsigned char*)pStart, src - pStart);     //Calculate CRC
   if (crc != bin_to_uint16(src)) {          //iseq CRC
     ret = MRB_DUMP_INVALID_IREP;
     goto error_exit;
@@ -413,7 +405,7 @@ read_rite_irep_record(mrb_state *mrb, unsigned char *src, mrb_irep *irep, uint32
 
       switch (tt) {                           //pool data
       case MRB_TT_FIXNUM:
-        fix_num = readint(buf, 10);
+        fix_num = strtol(buf, NULL, 10);
         irep->pool[i] = mrb_fixnum_value(fix_num);
         break;
 
@@ -426,7 +418,7 @@ read_rite_irep_record(mrb_state *mrb, unsigned char *src, mrb_irep *irep, uint32
         irep->pool[i] = mrb_str_new(mrb, buf, pdl);
         break;
 
-#ifdef INCLUDE_REGEXP
+#ifdef ENABLE_REGEXP
       case MRB_TT_REGEX:
         str = mrb_str_new(mrb, buf, pdl);
         irep->pool[i] = mrb_reg_quote(mrb, str);
@@ -439,7 +431,7 @@ read_rite_irep_record(mrb_state *mrb, unsigned char *src, mrb_irep *irep, uint32
       }
     }
   }
-  crc = calc_crc_16_ccitt((unsigned char *)pStart, src - pStart);     //Calculate CRC
+  crc = calc_crc_16_ccitt((unsigned char*)pStart, src - pStart);     //Calculate CRC
   if (crc != bin_to_uint16(src)) {          //pool CRC
     ret = MRB_DUMP_INVALID_IREP;
     goto error_exit;
@@ -477,10 +469,10 @@ read_rite_irep_record(mrb_state *mrb, unsigned char *src, mrb_irep *irep, uint32
       memcpy(buf, src, snl);                  //symbol name
       src += snl;
       buf[snl] = '\0';
-      irep->syms[i] = mrb_intern(mrb, buf);
+      irep->syms[i] = mrb_intern2(mrb, buf, snl);
     }
   }
-  crc = calc_crc_16_ccitt((unsigned char *)pStart, src - pStart);     //Calculate CRC
+  crc = calc_crc_16_ccitt((unsigned char*)pStart, src - pStart);     //Calculate CRC
   if (crc != bin_to_uint16(src)) {           //syms CRC
     ret = MRB_DUMP_INVALID_IREP;
     goto error_exit;
@@ -489,6 +481,7 @@ read_rite_irep_record(mrb_state *mrb, unsigned char *src, mrb_irep *irep, uint32
 
   *len = src - recordStart;
 error_exit:
+  mrb_gc_arena_restore(mrb, ai);
   if (buf)
     mrb_free(mrb, buf);
 
@@ -529,14 +522,12 @@ mrb_read_irep(mrb_state *mrb, const char *bin)
     src += MRB_DUMP_SIZE_OF_LONG;                      //record ren
     if ((ret = read_rite_irep_record(mrb, src, mrb->irep[i], &len)) != MRB_DUMP_OK)
       goto error_exit;
-    mrb->irep[i]->idx = i;
+    mrb->irep[mrb->irep_len++]->idx = i;
     src += len;
   }
   if (0 != bin_to_uint32(src)) {              //dummy record len
     ret = MRB_DUMP_GENERAL_FAILURE;
   }
-
-  mrb->irep_len += nirep;
 
 error_exit:
   if (ret != MRB_DUMP_OK) {
