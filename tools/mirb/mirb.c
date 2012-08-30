@@ -13,6 +13,19 @@
 #include <mruby/data.h>
 #include <mruby/compile.h>
 
+#ifndef ENABLE_STDIO
+#include <mruby/string.h>
+static void
+p(mrb_state *mrb, mrb_value obj)
+{
+  obj = mrb_funcall(mrb, obj, "inspect", 0);
+  fwrite(RSTRING_PTR(obj), RSTRING_LEN(obj), 1, stdout);
+  putc('\n', stdout);
+}
+#else
+#define p(mrb,obj) mrb_p(mrb,obj)
+#endif
+
 /* Guess if the user might want to enter more
  * or if he wants an evaluation of his code now */
 int
@@ -37,10 +50,10 @@ is_code_block_open(struct mrb_parser_state *parser)
       code_block_open = TRUE;
     }
     else if (strcmp(message, "syntax error, unexpected keyword_end") == 0) {
-      code_block_open = TRUE;
+      code_block_open = FALSE;
     }
     else if (strcmp(message, "syntax error, unexpected tREGEXP_BEG") == 0) {
-      code_block_open = TRUE;
+      code_block_open = FALSE;
     }
     return code_block_open;
   }
@@ -132,23 +145,24 @@ main(void)
 {
   char last_char, ruby_code[1024], last_code_line[1024];
   int char_index;
+  mrbc_context *cxt;
   struct mrb_parser_state *parser;
-  mrb_state *mrb_interpreter;
-  mrb_value mrb_return_value;
-  int byte_code;
+  mrb_state *mrb;
+  mrb_value result;
+  int n;
   int code_block_open = FALSE;
 
   print_hint();
 
   /* new interpreter instance */ 
-  mrb_interpreter = mrb_open();
-  if (mrb_interpreter == NULL) {
-    fprintf(stderr, "Invalid mrb_interpreter, exiting mirb");
+  mrb = mrb_open();
+  if (mrb == NULL) {
+    fprintf(stderr, "Invalid mrb interpreter, exiting mirb");
     return EXIT_FAILURE;
   }
 
-  /* new parser instance */
-  parser = mrb_parser_new(mrb_interpreter);
+  cxt = mrbc_context_new(mrb);
+  cxt->capture_errors = 1;
   memset(ruby_code, 0, sizeof(*ruby_code));
   memset(last_code_line, 0, sizeof(*last_code_line));
 
@@ -167,23 +181,20 @@ main(void)
 
     last_code_line[char_index] = '\0';
 
-    if ((strcmp(last_code_line, "quit") == 0) ||
-        (strcmp(last_code_line, "exit") == 0)) {
-      if (code_block_open) {
-        /* cancel the current block and reset */
-        code_block_open = FALSE;
-        memset(ruby_code, 0, sizeof(*ruby_code));
-        memset(last_code_line, 0, sizeof(*last_code_line));
-        continue;
-      }
-      else {
-        /* quit the program */
+    if ((strcmp(last_code_line, "quit") == 0) || (strcmp(last_code_line, "exit") == 0)) {
+      if (!code_block_open || !parser->sterm){
         break;
       }
+      else{
+        /* count the quit/exit commands as strings if in a quote block */
+        strcat(ruby_code, "\n");
+        strcat(ruby_code, last_code_line);
+      }
     }
+
     else {
       if (code_block_open) {
-	strcat(ruby_code, "\n");
+        strcat(ruby_code, "\n");
         strcat(ruby_code, last_code_line);
       }
       else {
@@ -192,11 +203,11 @@ main(void)
       }
 
       /* parse code */
+      parser = mrb_parser_new(mrb);
       parser->s = ruby_code;
       parser->send = ruby_code + strlen(ruby_code);
-      parser->capture_errors = 1;
       parser->lineno = 1;
-      mrb_parser_parse(parser);
+      mrb_parser_parse(parser, cxt);
       code_block_open = is_code_block_open(parser); 
 
       if (code_block_open) {
@@ -209,31 +220,32 @@ main(void)
         }
 	else {
           /* generate bytecode */
-          byte_code = mrb_generate_code(mrb_interpreter, parser->tree);
+          n = mrb_generate_code(mrb, parser);
 
           /* evaluate the bytecode */
-          mrb_return_value = mrb_run(mrb_interpreter,
+          result = mrb_run(mrb,
             /* pass a proc for evaulation */
-            mrb_proc_new(mrb_interpreter, mrb_interpreter->irep[byte_code]),
-            mrb_top_self(mrb_interpreter));
+            mrb_proc_new(mrb, mrb->irep[n]),
+            mrb_top_self(mrb));
           /* did an exception occur? */
-          if (mrb_interpreter->exc) {
-            mrb_p(mrb_interpreter, mrb_obj_value(mrb_interpreter->exc));
-            mrb_interpreter->exc = 0;
+          if (mrb->exc) {
+            p(mrb, mrb_obj_value(mrb->exc));
+            mrb->exc = 0;
           }
 	  else {
             /* no */
             printf(" => ");
-            mrb_p(mrb_interpreter, mrb_return_value);
+            p(mrb, result);
           }
         }
-
         memset(ruby_code, 0, sizeof(*ruby_code));
         memset(ruby_code, 0, sizeof(*last_code_line));
       }
+      mrb_parser_free(parser);
     }
   }
-  mrb_close(mrb_interpreter);
+  mrbc_context_free(mrb, cxt);
+  mrb_close(mrb);
 
   return 0;
 }

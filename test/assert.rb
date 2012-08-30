@@ -2,6 +2,7 @@ $ok_test = 0
 $ko_test = 0
 $kill_test = 0
 $asserts  = []
+$test_start = Time.now if Object.const_defined?(:Time)
 
 ##
 # Print the assertion in a readable way
@@ -68,13 +69,19 @@ def report()
   print('Crash: ')
   print($kill_test)
   print("\n")
+
+  if Object.const_defined?(:Time)
+    print(' Time: ')
+    print(Time.now - $test_start)
+    print(" seconds\n")
+  end
 end
 
 ##
 # Performs fuzzy check for equality on methods returning floats
 # on the basis of the Math::TOLERANCE constant.
 def check_float(a, b)
-  tolerance = 1e-12
+  tolerance = Math::TOLERANCE
   a = a.to_f
   b = b.to_f
   if a.finite? and b.finite?

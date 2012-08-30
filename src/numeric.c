@@ -8,13 +8,10 @@
 #include "mruby/numeric.h"
 #include "mruby/string.h"
 #include "mruby/array.h"
-#include <string.h>
-#include "mruby/class.h"
-#include "mruby/variable.h"
 
-#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
+#include <assert.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ < 4
 #include <floatingpoint.h>
@@ -186,15 +183,25 @@ static mrb_value
 flo_to_s(mrb_state *mrb, mrb_value flt)
 {
   char buf[32];
+  int n;
   mrb_float value = mrb_float(flt);
 
-  if (isinf(value))
-    return mrb_str_new2(mrb, value < 0 ? "-inf" : "inf");
-  else if(isnan(value))
-    return mrb_str_new2(mrb, "NaN");
+  if (isinf(value)) {
+    static const char s[2][5] = { "-inf", "inf" };
+    static const int n[] = { 4, 3 };
+    int idx;
+    idx = (value < 0) ? 0 : 1;
+    return mrb_str_new(mrb, s[idx], n[idx]);
+  } else if(isnan(value))
+    return mrb_str_new(mrb, "NaN", 3);
 
-  sprintf(buf, "%.14g", value);
-  return mrb_str_new2(mrb, buf);
+#ifdef MRB_USE_FLOAT
+  n = sprintf(buf, "%.7g", value);
+#else
+  n = sprintf(buf, "%.14g", value);
+#endif
+  assert(n >= 0);
+  return mrb_str_new(mrb, buf, n);
 }
 
 /* 15.2.9.3.2  */
@@ -508,21 +515,13 @@ flo_ceil(mrb_state *mrb, mrb_value num)
  */
 
 static mrb_value
-flo_round(mrb_state *mrb, /*int argc, mrb_value *argv,*/ mrb_value num)
+flo_round(mrb_state *mrb, mrb_value num)
 {
-  mrb_value nd;
-  mrb_float number, f;
+  double number, f;
   int ndigits = 0, i;
-  mrb_value *argv;
-  int argc;
 
-  mrb_get_args(mrb, "*", &argv, &argc);
-
-  if (argc == 1) {
-    nd = argv[0];
-    ndigits = mrb_fixnum(nd);
-  }
-  number  = mrb_float(num);
+  mrb_get_args(mrb, "|i", &ndigits);
+  number = mrb_float(num);
   f = 1.0;
   i = abs(ndigits);
   while  (--i >= 0)
@@ -532,7 +531,7 @@ flo_round(mrb_state *mrb, /*int argc, mrb_value *argv,*/ mrb_value num)
     if (ndigits < 0) number = 0;
   }
   else {
-    mrb_float d;
+    double d;
 
     if (ndigits < 0) number /= f;
     else number *= f;
@@ -550,7 +549,6 @@ flo_round(mrb_state *mrb, /*int argc, mrb_value *argv,*/ mrb_value num)
     if (ndigits < 0) number *= f;
     else number /= f;
   }
-
   if (ndigits > 0) return mrb_float_value(number);
   return mrb_fixnum_value((mrb_int)number);
 }
@@ -1158,7 +1156,7 @@ mrb_fix2str(mrb_state *mrb, mrb_value x, int base)
     mrb_raise(mrb, E_ARGUMENT_ERROR, "invalid radix %d", base);
   }
   if (val == 0) {
-    return mrb_str_new2(mrb, "0");
+    return mrb_str_new(mrb, "0", 1);
   }
   if (val < 0) {
     val = -val;
@@ -1285,7 +1283,7 @@ mrb_init_numeric(mrb_state *mrb)
   integer = mrb_define_class(mrb, "Integer",  numeric);
   fixnum = mrb->fixnum_class = mrb_define_class(mrb, "Fixnum", integer);
 
-  mrb_undef_method(mrb,  fixnum, "new");
+  mrb_undef_class_method(mrb,  fixnum, "new");
   mrb_define_method(mrb, fixnum,  "+",        fix_plus,          ARGS_REQ(1)); /* 15.2.8.3.1  */
   mrb_define_method(mrb, fixnum,  "-",        fix_minus,         ARGS_REQ(1)); /* 15.2.8.3.2  */
   mrb_define_method(mrb, fixnum,  "-@",       fix_uminus,        ARGS_REQ(1)); /* 15.2.7.4.2  */
@@ -1313,7 +1311,7 @@ mrb_init_numeric(mrb_state *mrb)
 
   /* Float Class */
   fl = mrb->float_class = mrb_define_class(mrb, "Float", numeric);
-  mrb_undef_method(mrb,  fl, "new");
+  mrb_undef_class_method(mrb,  fl, "new");
   mrb_define_method(mrb, fl,      "+",         flo_plus,         ARGS_REQ(1)); /* 15.2.9.3.1  */
   mrb_define_method(mrb, fl,      "-",         flo_minus,        ARGS_REQ(1)); /* 15.2.9.3.2  */
   mrb_define_method(mrb, fl,      "*",         flo_mul,          ARGS_REQ(1)); /* 15.2.9.3.3  */

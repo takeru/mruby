@@ -6,14 +6,10 @@
 
 #include "mruby.h"
 #include <stdarg.h>
-#include <string.h>
 #include <stdio.h>
 #include <setjmp.h>
+#include <string.h>
 #include "error.h"
-#include "opcode.h"
-#include "mruby/irep.h"
-#include "mruby/proc.h"
-#include "mruby/numeric.h"
 #include "mruby/variable.h"
 #include "mruby/string.h"
 #include "mruby/class.h"
@@ -34,7 +30,6 @@ mrb_exc_new3(mrb_state *mrb, struct RClass* c, mrb_value str)
   return mrb_funcall(mrb, mrb_obj_value(c), "new", 1, str);
 }
 
-//mrb_value make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr);
 /*
  * call-seq:
  *    Exception.new(msg = nil)   ->  exception
@@ -150,7 +145,7 @@ exc_equal(mrb_state *mrb, mrb_value exc)
   if (mrb_obj_equal(mrb, exc, obj)) return mrb_true_value();
 
   if (mrb_obj_class(mrb, exc) != mrb_obj_class(mrb, obj)) {
-    if ( mrb_respond_to(mrb, obj, mrb_intern(mrb, "message")) ) {
+    if (mrb_respond_to(mrb, obj, mrb_intern(mrb, "message"))) {
       mesg = mrb_funcall(mrb, obj, "message", 0);
     }
     else
@@ -169,6 +164,9 @@ void
 mrb_exc_raise(mrb_state *mrb, mrb_value exc)
 {
     mrb->exc = (struct RObject*)mrb_object(exc);
+    if (!mrb->jmp) {
+      abort();
+    }
     longjmp(*(jmp_buf*)mrb->jmp, 1);
 }
 
@@ -180,7 +178,7 @@ mrb_raise(mrb_state *mrb, struct RClass *c, const char *fmt, ...)
   int n;
 
   va_start(args, fmt);
-  n = vsnprintf(buf, 256, fmt, args);
+  n = vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   if (n < 0) {
     n = 0;
@@ -197,7 +195,7 @@ mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...)
   int n;
 
   va_start(args, fmt);
-  n = vsnprintf(buf, 256, fmt, args);
+  n = vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   if (n < 0) {
     n = 0;
@@ -216,7 +214,7 @@ mrb_sprintf(mrb_state *mrb, const char *fmt, ...)
   int n;
 
   va_start(args, fmt);
-  n = vsnprintf(buf, 256, fmt, args);
+  n = vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   if (n < 0) {
     n = 0;
@@ -282,7 +280,7 @@ sysexit_status(mrb_state *mrb, mrb_value err)
 static void
 set_backtrace(mrb_state *mrb, mrb_value info, mrb_value bt)
 {
-        mrb_funcall(mrb, info, "set_backtrace", 1, bt);
+  mrb_funcall(mrb, info, "set_backtrace", 1, bt);
 }
 
 mrb_value
@@ -312,20 +310,15 @@ make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr)
     case 3:
       n = 1;
 exception_call:
-      //if (argv[0] == sysstack_error) return argv[0];
-
-      //CONST_ID(mrb, exception, "exception");
-      //mesg = mrb_check_funcall(mrb, argv[0], exception, n, argv+1);
-      //if (mrb_nil_p(mesg)) {
-      //  /* undef */
-      //  mrb_raise(mrb, E_TYPE_ERROR, "exception class/object expected");
-      //}
-      if (mrb_respond_to(mrb, argv[0], mrb_intern(mrb, "exception"))) {
-        mesg = mrb_funcall_argv(mrb, argv[0], "exception", n, argv+1);
-      }
-      else {
-        /* undef */
-        mrb_raise(mrb, E_TYPE_ERROR, "exception class/object expected");
+      {
+	mrb_sym exc = mrb_intern(mrb, "exception");
+	if (mrb_respond_to(mrb, argv[0], exc)) {
+	  mesg = mrb_funcall_argv(mrb, argv[0], exc, n, argv+1);
+	}
+	else {
+	  /* undef */
+	  mrb_raise(mrb, E_TYPE_ERROR, "exception class/object expected");
+	}
       }
 
       break;

@@ -1,5 +1,5 @@
 /*
-** variable.h - mruby variables
+** mruby/variable.h - mruby variables
 **
 ** See Copyright Notice in mruby.h
 */
@@ -20,6 +20,7 @@ typedef struct global_variable {
     //int block_trace;
     //struct trace_var *trace;
 } global_variable;
+
 struct global_entry {
     global_variable *var;
     mrb_sym id;
@@ -37,16 +38,21 @@ mrb_value mrb_const_get(mrb_state*, mrb_value, mrb_sym);
 void mrb_const_set(mrb_state*, mrb_value, mrb_sym, mrb_value);
 int mrb_const_defined(mrb_state*, mrb_value, mrb_sym);
 
-mrb_value mrb_obj_iv_get(mrb_state*, struct RObject*, mrb_sym);
-void mrb_obj_iv_set(mrb_state*, struct RObject*, mrb_sym, mrb_value);
-const char * mrb_class2name(mrb_state *mrb, struct RClass* klass);
+mrb_value mrb_obj_iv_get(mrb_state *mrb, struct RObject *obj, mrb_sym sym);
+void mrb_obj_iv_set(mrb_state *mrb, struct RObject *obj, mrb_sym sym, mrb_value v);
+int mrb_obj_iv_defined(mrb_state *mrb, struct RObject *obj, mrb_sym sym);
 mrb_value mrb_iv_get(mrb_state *mrb, mrb_value obj, mrb_sym sym);
-void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, mrb_value v); /* mrb_iv_set */
-void mrb_copy_generic_ivar(mrb_value clone, mrb_value obj);
+void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, mrb_value v);
+int mrb_iv_defined(mrb_state*, mrb_value, mrb_sym);
+mrb_value mrb_iv_remove(mrb_state *mrb, mrb_value obj, mrb_sym sym);
+void mrb_iv_copy(mrb_state *mrb, mrb_value dst, mrb_value src);
 int mrb_const_defined_at(mrb_state *mrb, struct RClass *klass, mrb_sym id);
 mrb_value mrb_f_global_variables(mrb_state *mrb, mrb_value self);
 mrb_value mrb_gv_get(mrb_state *mrb, mrb_sym sym);
 void mrb_gv_set(mrb_state *mrb, mrb_sym sym, mrb_value val);
+mrb_value mrb_obj_instance_variables(mrb_state*, mrb_value);
+mrb_value mrb_obj_iv_inspect(mrb_state*, struct RObject*);
+mrb_sym mrb_class_sym(mrb_state *mrb, struct RClass *c, struct RClass *outer);
 
 /* GC functions */
 void mrb_gc_mark_gv(mrb_state*);

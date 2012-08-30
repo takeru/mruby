@@ -11,8 +11,6 @@
 #include "mruby/array.h"
 #include "mruby/string.h"
 #include "mruby/variable.h"
-#include <string.h>
-#include <stdio.h>
 
 static inline khint_t
 mrb_hash_ht_hash_func(mrb_state *mrb, mrb_value key)
@@ -31,7 +29,8 @@ mrb_hash_ht_hash_equal(mrb_state *mrb, mrb_value a, mrb_value b)
   return mrb_eql(mrb, a, b);
 }
 
-KHASH_INIT(ht, mrb_value, mrb_value, 1, mrb_hash_ht_hash_func, mrb_hash_ht_hash_equal);
+KHASH_DECLARE(ht, mrb_value, mrb_value, 1);
+KHASH_DEFINE (ht, mrb_value, mrb_value, 1, mrb_hash_ht_hash_func, mrb_hash_ht_hash_equal);
 
 static void mrb_hash_modify(mrb_state *mrb, mrb_value hash);
 
@@ -569,7 +568,9 @@ mrb_hash_shift(mrb_state *mrb, mrb_value hash)
         if (!kh_exist(h,k)) continue;
 
         delKey = kh_key(h,k);
+        mrb_gc_protect(mrb, delKey);
         delVal = mrb_hash_delete_key(mrb, hash, delKey);
+        mrb_gc_protect(mrb, delVal);
 
 	return mrb_assoc_new(mrb, delKey, delVal);
       }
@@ -888,9 +889,9 @@ inspect_hash(mrb_state *mrb, mrb_value hash, int recur)
   khash_t(ht) *h = RHASH_TBL(hash);
   khiter_t k;
 
-  if (recur) return mrb_str_new_cstr(mrb, "{...}");
+  if (recur) return mrb_str_new(mrb, "{...}", 5);
 
-  str = mrb_str_new_cstr(mrb, "{");
+  str = mrb_str_new(mrb, "{", 1);
   if (h && kh_size(h) > 0) {
     for (k = kh_begin(h); k != kh_end(h); k++) {
       int ai;
@@ -903,14 +904,14 @@ inspect_hash(mrb_state *mrb, mrb_value hash, int recur)
 
       str2 = mrb_inspect(mrb, kh_key(h,k));
       mrb_str_append(mrb, str, str2);
-      mrb_str_buf_cat(mrb, str, "=>", strlen("=>"));
+      mrb_str_buf_cat(mrb, str, "=>", 2);
       str2 = mrb_inspect(mrb, kh_value(h,k));
       mrb_str_append(mrb, str, str2);
 
       mrb_gc_arena_restore(mrb, ai);
     }
   }
-  mrb_str_buf_cat(mrb, str, "}", strlen("}"));//mrb_str_buf_cat2(str, "}");
+  mrb_str_buf_cat(mrb, str, "}", 1);
 
   return str;
 }
@@ -933,7 +934,7 @@ mrb_hash_inspect(mrb_state *mrb, mrb_value hash)
   khash_t(ht) *h = RHASH_TBL(hash);
 
   if (!h || kh_size(h) == 0)
-    return mrb_str_new_cstr(mrb, "{}");
+    return mrb_str_new(mrb, "{}", 2);
   return inspect_hash(mrb, hash, 0);
 }
 
@@ -1338,9 +1339,9 @@ mrb_init_hash(mrb_state *mrb)
   mrb_define_method(mrb, h, "default_proc",    mrb_hash_default_proc,ARGS_NONE()); /* 15.2.13.4.7  */
   mrb_define_method(mrb, h, "default_proc=",   mrb_hash_set_default_proc,ARGS_REQ(1)); /* 15.2.13.4.7  */
   mrb_define_method(mrb, h, "__delete",        mrb_hash_delete,      ARGS_REQ(1)); /* core of 15.2.13.4.8  */
-//mrb_define_method(mrb, h, "each",            mrb_hash_each_pair,   ARGS_NONE()); /* 15.2.13.4.9  */ /* move to mrblib\hash.rb */
-//mrb_define_method(mrb, h, "each_key",        mrb_hash_each_key,    ARGS_NONE()); /* 15.2.13.4.10 */ /* move to mrblib\hash.rb */
-//mrb_define_method(mrb, h, "each_value",      mrb_hash_each_value,  ARGS_NONE()); /* 15.2.13.4.11 */ /* move to mrblib\hash.rb */
+// "each"                                                                             15.2.13.4.9  move to mrblib/hash.rb
+// "each_key"                                                                         15.2.13.4.10 move to mrblib/hash.rb
+// "each_value"                                                                       15.2.13.4.11 move to mrblib/hash.rb
   mrb_define_method(mrb, h, "empty?",          mrb_hash_empty_p,     ARGS_NONE()); /* 15.2.13.4.12 */
   mrb_define_method(mrb, h, "has_key?",        mrb_hash_has_key,     ARGS_REQ(1)); /* 15.2.13.4.13 */
   mrb_define_method(mrb, h, "has_value?",      mrb_hash_has_value,   ARGS_REQ(1)); /* 15.2.13.4.14 */
@@ -1351,7 +1352,7 @@ mrb_init_hash(mrb_state *mrb)
   mrb_define_method(mrb, h, "keys",            mrb_hash_keys,        ARGS_NONE()); /* 15.2.13.4.19 */
   mrb_define_method(mrb, h, "length",          mrb_hash_size_m,      ARGS_NONE()); /* 15.2.13.4.20 */
   mrb_define_method(mrb, h, "member?",         mrb_hash_has_key,     ARGS_REQ(1)); /* 15.2.13.4.21 */
-//mrb_define_method(mrb, h, "merge",           mrb_hash_merge,       ARGS_REQ(1)); /* 15.2.13.4.22 */ /* move to mrblib\hash.rb */
+// "merge"                                                                            15.2.13.4.22 move to mrblib/hash.rb
   mrb_define_method(mrb, h, "replace",         mrb_hash_replace,     ARGS_REQ(1)); /* 15.2.13.4.23 */
   mrb_define_method(mrb, h, "shift",           mrb_hash_shift,       ARGS_NONE()); /* 15.2.13.4.24 */
   mrb_define_method(mrb, h, "size",            mrb_hash_size_m,      ARGS_NONE()); /* 15.2.13.4.25 */

@@ -8,13 +8,8 @@
 #include "mruby/khash.h"
 #include <string.h>
 
-#include <stdarg.h>
-#include <string.h>
 #include "mruby/string.h"
 #include <ctype.h>
-#include "mruby/class.h"
-#include "mruby/variable.h"
-#include <stdio.h>
 
 /* ------------------------------------------------------ */
 typedef struct symbol_name {
@@ -36,7 +31,8 @@ sym_hash_func(mrb_state *mrb, const symbol_name s)
 }
 #define sym_hash_equal(mrb,a, b) (a.len == b.len && memcmp(a.name, b.name, a.len) == 0)
 
-KHASH_INIT(n2s, symbol_name, mrb_sym, 1, sym_hash_func, sym_hash_equal)
+KHASH_DECLARE(n2s, symbol_name, mrb_sym, 1)
+KHASH_DEFINE (n2s, symbol_name, mrb_sym, 1, sym_hash_func, sym_hash_equal)
 /* ------------------------------------------------------ */
 mrb_sym
 mrb_intern2(mrb_state *mrb, const char *name, int len)
@@ -54,7 +50,7 @@ mrb_intern2(mrb_state *mrb, const char *name, int len)
     return kh_value(h, k);
 
   sym = ++mrb->symidx;
-  p = mrb_malloc(mrb, len+1);
+  p = (char *)mrb_malloc(mrb, len+1);
   memcpy(p, name, len);
   p[len] = 0;
   sname.name = (const char*)p;
@@ -98,7 +94,7 @@ mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, int *lenp)
 }
 
 void
-mrb_free_symtbls(mrb_state *mrb)
+mrb_free_symtbl(mrb_state *mrb)
 {
   khash_t(n2s) *h = mrb->name2sym;
   khiter_t k;
@@ -240,7 +236,7 @@ is_special_global_name(const char* m)
         if (is_identchar(*m)) m += 1;
         break;
       default:
-        if (!ISDIGIT(*m)) return 0;
+        if (!ISDIGIT(*m)) return FALSE;
         do ++m; while (ISDIGIT(*m));
     }
     return !*m;
@@ -276,6 +272,7 @@ symname_p(const char *name)
       case '>':
         switch (*++m) {
           case '>': case '=': ++m; break;
+	default: break;
         }
         break;
 
@@ -319,7 +316,8 @@ id:
         while (is_identchar(*m)) m += 1;
         if (localid) {
             switch (*m) {
-              case '!': case '?': case '=': ++m;
+	    case '!': case '?': case '=': ++m;
+	    default: break;
             }
         }
         break;
@@ -341,7 +339,7 @@ sym_inspect(mrb_state *mrb, mrb_value sym)
   memcpy(RSTRING(str)->ptr+1, name, len);
   if (!symname_p(name) || strlen(name) != len) {
     str = mrb_str_dump(mrb, str);
-    strncpy(RSTRING(str)->ptr, ":\"", 2);
+    memcpy(RSTRING(str)->ptr, ":\"", 2);
   }
   return str;
 }
@@ -406,4 +404,5 @@ mrb_init_symbol(mrb_state *mrb)
   mrb_define_method(mrb, sym, "to_sym",          sym_to_sym,              ARGS_NONE());              /* 15.2.11.3.4  */
   mrb_define_method(mrb, sym, "inspect",         sym_inspect,             ARGS_NONE());              /* 15.2.11.3.5(x)  */
   mrb_define_method(mrb, sym, "<=>",             sym_cmp,                 ARGS_REQ(1));
+  mrb->init_sym = mrb_intern(mrb, "initialize");
 }
