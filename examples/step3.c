@@ -32,7 +32,7 @@ int main()
   mrb = mrb_open();
   f = fopen("step3.rb", "r");
   if(f==NULL){ _error("file not found."); }
-  n = mrb_compile_file(mrb, f);
+  n = mrb_load_file(mrb, f);
   fclose(f);
   mrb_run(mrb, mrb_proc_new(mrb, mrb->irep[n]), mrb_nil_value());
 

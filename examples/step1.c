@@ -11,7 +11,7 @@ int main()
   int n;
 
   mrb = mrb_open();
-  n = mrb_compile_string(mrb, "puts 'hello'; puts 1+2; p({:a=>[1,2,3], :b=>{'c'=>{'d'=>['e', {'f'=>nil}]}}})");
+  n = mrb_load_string(mrb, "puts 'hello'; puts 1+2; p({:a=>[1,2,3], :b=>{'c'=>{'d'=>['e', {'f'=>nil}]}}})");
   mrb_run(mrb, mrb_proc_new(mrb, mrb->irep[n]), mrb_nil_value());
   mrb_close(mrb);
 }
